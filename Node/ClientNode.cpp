@@ -8,55 +8,58 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <regex>
 using namespace boost::program_options;
 
 #include "ClientNode.h"
-#include "Lib.h"
+#include "../Lib.h"
+#include "../Messages/SimpleCommand.h"
+#include "../Messages/ComplexCommand.h"
 void ClientNode::OpenMultiacastSocket() {
-  int sock, optval;
-  sock = socket(AF_INET, SOCK_DGRAM, 0);
-  if (sock < 0)
+  int optval;
+  multicast_socket_ = socket(AF_INET, SOCK_DGRAM, 0);
+  if (multicast_socket_ < 0)
     throw "Unable to open socket";
 
   optval = 1;
-  if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void *) &optval, sizeof(int)) < 0)
+  if (setsockopt(multicast_socket_, SOL_SOCKET, SO_REUSEADDR, (void *) &optval, sizeof(int)) < 0)
     throw "setsockopt(SO_REUSEADDR) failed";
   optval = 1;
-  if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (void *) &optval,
+  if (setsockopt(multicast_socket_, SOL_SOCKET, SO_BROADCAST, (void *) &optval,
                  sizeof optval) < 0)
     throw "setsockopt broadcast";
 
   optval = 100;
-  if (setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, (void *) &optval,
+  if (setsockopt(multicast_socket_, IPPROTO_IP, IP_MULTICAST_TTL, (void *) &optval,
                  sizeof optval) < 0)
     throw "setsockopt multicast ttl";
   struct timeval opttime;
-  opttime.tv_sec = timeout;
+  opttime.tv_sec = timeout_;
   opttime.tv_usec = 0;
 
-  if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (void *) &opttime, sizeof opttime) < 0)
-    throw ("setsockopt receive timeout");
+  if (setsockopt(multicast_socket_, SOL_SOCKET, SO_RCVTIMEO, (void *) &opttime, sizeof opttime) < 0)
+    throw ("setsockopt receive timeout_");
 
   /* podpięcie się do grupy rozsyłania (ang. multicast) */
   struct ip_mreq mreq;
   mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-  if (inet_aton(mcast_addr.c_str(), &mreq.imr_multiaddr) == 0)
+  if (inet_aton(mcast_addr_.c_str(), &mreq.imr_multiaddr) == 0)
     throw ("inet_aton");
-  if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *) &mreq,
-                 sizeof (ip_mreq)) < 0)
+  if (setsockopt(multicast_socket_, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *) &mreq,
+                 sizeof(ip_mreq)) < 0)
     throw ("setsockopt");
 
-  client_address.sin_family = AF_INET;
-  client_address.sin_addr.s_addr = htonl(INADDR_ANY);
-  client_address.sin_port = htons(0);
+  client_address_.sin_family = AF_INET;
+  client_address_.sin_addr.s_addr = htonl(INADDR_ANY);
+  client_address_.sin_port = htons(0);
 
-  server_address.sin_family = AF_INET;
-  server_address.sin_port = htons(cmd_port);
-  if (inet_aton(mcast_addr.c_str(), &server_address.sin_addr) == 0)
+  server_address_.sin_family = AF_INET;
+  server_address_.sin_port = htons(cmd_port_);
+  if (inet_aton(mcast_addr_.c_str(), &server_address_.sin_addr) == 0)
     throw ("inet_aton");
-  if (bind(sock, (struct sockaddr *) &client_address, sizeof(client_address)) < 0)
+  if (bind(multicast_socket_, (struct sockaddr *) &client_address_, sizeof(client_address_)) < 0)
     throw "bind";
 }
 
@@ -64,12 +67,45 @@ void ClientNode::Search(std::string filename) {
 
 }
 void ClientNode::Discover() {
+  log_message("Discover begin");
+  uint64_t send_seq = 1;// random_seq();
+  SimpleCommand request_message(std::string("HELLO"), send_seq, std::string(""));
+  log_message("Prepared message");
+
+  request_message.SendTo(multicast_socket_,
+                         0,
+                         reinterpret_cast<const sockaddr *>(&server_address_),
+                         sizeof(server_address_));
+
+  log_message("Sent message");
+
+//  int rcva_len = sizeof(client_address_);
+  ComplexCommand response_message(multicast_socket_,
+                                  0,
+                                  reinterpret_cast<struct sockadrr_in *>(&server_address_),
+                                  sizeof(client_address_));
+
+  while (response_message.GetLen() > 0) {
+    log_message("Processing response " + response_message.GetCommand());
+
+    printf("Found %s (%s) with free space %lu\n", response_message.GetData().c_str(),
+           inet_ntoa(server_address_.sin_addr), response_message.GetParam());
+
+    response_message = ComplexCommand(multicast_socket_,
+                                      0,
+                                      reinterpret_cast<struct sockadrr_in *>(&server_address_),
+                                      send_seq);
+
+  }
+  log_message("Discover end");
 
 }
+
 ClientNode::ClientNode(char **argsv, int argc) {
   ParseArguments(argsv, argc);
   OpenMultiacastSocket();
 }
+
 void ClientNode::ParseArguments(char **argv, int argc) {
   options_description desc{"Options"};
   desc.add_options()
@@ -87,27 +123,28 @@ void ClientNode::ParseArguments(char **argv, int argc) {
       command_line_style::long_allow_adjacent |
           command_line_style::short_allow_adjacent |
           command_line_style::allow_long_disguise).run(), vm);
-//  store(parse_command_line(argc, argv, desc), vm);
+
   notify(vm);
 
   if (vm.count("g")) {
-    mcast_addr = vm["g"].as<std::string>();
+    mcast_addr_ = vm["g"].as<std::string>();
   }
   if (vm.count("p")) {
-    cmd_port = vm["p"].as<int>();
+    cmd_port_ = vm["p"].as<int>();
   }
   if (vm.count("o")) {
-    path_to_folder = vm["o"].as<std::string>();
+    path_to_folder_ = vm["o"].as<std::string>();
   }
   if (vm.count("t")) {
-    timeout = vm["t"].as<int>();
+    timeout_ = vm["t"].as<int>();
   }
 }
 
 void ClientNode::StartWorking() {
-  std::regex exit("exit");
-  std::regex discover("discover");
-  std::regex fetch("fetch (\\w*)\n");
+  std::regex exit("^exit$");
+  std::regex discover("^discover$");
+  std::regex fetch("^fetch (\\w*)$");
+  std::regex argument(" (\\w*)$");
   while (true) {
     std::smatch matched;
 
@@ -115,11 +152,13 @@ void ClientNode::StartWorking() {
     std::getline(std::cin, command);
 
     if (std::regex_search(command, matched, exit)) {
+      std::cout << matched[0];
       break;
     } else if (std::regex_search(command, matched, discover)) {
       Discover();
     } else if (std::regex_search(command, matched, fetch)) {
-      std::cout << matched[0];
+      std::regex_search(command, matched, argument);
+      std::cout << "fetch (" << matched[0] << ")\n";
     }
 
   }

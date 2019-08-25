@@ -8,18 +8,16 @@
 #include <memory>
 #include <string>
 #include <cstring>
-SimpleCommand::~SimpleCommand() {
-  free(buffor);
-}
-SimpleCommand::SimpleCommand(std::string &cmd,
+
+SimpleCommand::SimpleCommand(std::string cmd,
                              uint64_t cmd_seq,
-                             std::string &data) {
-  buffor = malloc(BUFFER_SIZE);
-  memset(buffor, 0, BUFFER_SIZE);
-  memcpy(buffor, cmd.c_str(), CMD_LENGTH);
-  *(uint64_t *) ((char *) buffor + CMD_LENGTH) = htobe64(cmd_seq);
-  memcpy((char *) buffor + CMD_LENGTH + sizeof(cmd_seq),
-         data.c_str(),
-         data.length());
-  len = CMD_LENGTH + sizeof(cmd_seq) + data.length();
+                             std::string data) : Command(cmd, cmd_seq, data, 0) {}
+
+SimpleCommand::SimpleCommand(const SimpleCommand &simple_command) : Command(buffor_,
+                                                                            GetSeq(),
+                                                                            GetData(),
+                                                                            0) {}
+
+int SimpleCommand::DataBegin() {
+  return 10 + sizeof(uint64_t);
 }

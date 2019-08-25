@@ -5,15 +5,17 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_C_FLAGS "-pthread -std=c14 -Wall -Wextra -Wshadow")
 set(CMAKE_CXX_FLAGS "-pthread -g -Wall")
 
-#Google_tests MUST NOT be used in those files or project will not compile!!!
 set(SOURCE_FILES
-        Node/Lib.h
+        Lib.h
+        Lib.cpp
         Node/ClientNode.cpp
         Node/ClientNode.h
         Node/ServerNode.cpp
         Node/ServerNode.h
+        Messages/ComplexCommand.h
         Messages/ComplexCommand.cpp
-        Messages/ComplexCommand.cpp
+        Messages/Command.h
+        Messages/Command.cpp
         Messages/SimpleCommand.h
         Messages/SimpleCommand.cpp
         )
@@ -24,10 +26,15 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 #Here you can add another boost libriaries
 find_package(Boost 1.45.0 COMPONENTS program_options)
 
+add_executable(test_main test_main.cpp)
 include_directories(${Boost_INCLUDE_DIRS})
 
 add_executable(client client_main.cpp ${SOURCE_FILES})
 target_link_libraries(client ${Boost_LIBRARIES})
+
+
+add_executable(server server_main.cpp ${SOURCE_FILES})
+target_link_libraries(server ${Boost_LIBRARIES})
 
 #Add Google_tests files here.
 #set(TEST_FILES

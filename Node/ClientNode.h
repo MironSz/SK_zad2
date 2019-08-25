@@ -14,13 +14,14 @@ class ClientNode {
   void OpenMultiacastSocket();
   void ParseArguments(char ** argsv, int argc);
  public:
-  struct sockaddr_in client_address;
-  struct sockaddr_in server_address;;
-  std::string mcast_addr;
-  int multiacast_socket;
-  int cmd_port;
-  int timeout;
-  std::string path_to_folder;
+  struct sockaddr_in client_address_;
+  struct sockaddr_in server_address_;
+  std::string mcast_addr_;
+  int multicast_socket_;
+  int cmd_port_;
+  int timeout_;
+  std::string path_to_folder_;
+
   ClientNode(char **argsv, int argc);
   void StartWorking();
 //  void IndexFiles();

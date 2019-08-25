@@ -6,13 +6,23 @@
 #define UNTITLED_MESSAGES_SIMPLECOMMAND_H_
 #include <memory>
 #include <string>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include "Command.h"
 
-class SimpleCommand {
+class SimpleCommand : public Command {
+ protected:
+  int DataBegin() override;
  public:
-  void * buffor;
-  int len;
-  SimpleCommand(std::string &cmd, uint64_t cmd_seq, std::string &data);
-  virtual ~SimpleCommand();
+  SimpleCommand(std::string buffor) : Command(buffor) {};
+  SimpleCommand(const SimpleCommand &);
+  SimpleCommand(std::string cmd, uint64_t cmd_seq, std::string data);
+  SimpleCommand(int socket, int flags, struct sockadrr_in *src_addr, uint64_t seq_nr) :
+      Command(socket, flags, src_addr, seq_nr) {};
+
 };
 
 #endif //UNTITLED_MESSAGES_SIMPLECOMMAND_H_
