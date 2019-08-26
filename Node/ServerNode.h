@@ -13,12 +13,12 @@
 #include "../Messages/Command.h"
 class ServerNode {
  private:
-  struct ip_mreq ip_mreq_;
-
+  ip_mreq ip_mreq_;
+  std::string ip;
   std::vector<std::string> files;
   void OpenMulticastSocket();
   void AlternativeOpenSocket();
-  void ParseArguments(char ** argsv, int argc);
+  void ParseArguments(char **argsv, int argc);
  public:
   sockaddr_in client_address_;
   sockaddr_in server_address_;
@@ -33,7 +33,7 @@ class ServerNode {
   void StartWorking();
   void IndexFiles();
 //  void ConnectMcaddr();
-  void Discover(Command * command);
+  void Discover(Command *command);
 //  void Search(std::string filename);
 //  void Fetch(std::string filename);
 //  void Upload(std::string filename);

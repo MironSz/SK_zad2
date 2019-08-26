@@ -20,6 +20,7 @@ class Command {
   void *CmdBegin();
 
  public:
+  std::string &GetBuffer();
   Command(std::string buffor) : buffor_(buffor) {};
   static Command *ReadCommand(int socket,
                               int flags,
@@ -30,7 +31,7 @@ class Command {
           int flags,
           struct sockadrr_in *src_addr,
           uint64_t seq_nr,
-          socklen_t rcva_len = sizeof(sockaddr));
+          socklen_t rcva_len = sizeof(sockaddr_in));
   Command(std::string cmd, uint64_t cmd_seq, std::string data, int data_begin);
   std::string GetData();
   std::string GetCommand();

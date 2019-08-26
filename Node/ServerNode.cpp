@@ -13,7 +13,9 @@
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <regex>
+#include <netdb.h>
 #include "dirent.h"
+
 using namespace boost::program_options;
 
 #include "../Lib.h"
@@ -39,6 +41,8 @@ void ServerNode::OpenMulticastSocket() {
 //    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &(int) {1}, sizeof(int)) < 0)
 //        syserr("setsockopt(SO_REUSEADDR) failed");
   /*Podpięcie się do grupy rozsyłania (ang. multicast) */
+
+
   optval = 1;
   if (setsockopt(multicast_socket_, SOL_SOCKET, SO_BROADCAST, (void *) &optval, sizeof optval) < 0)
     throw ("setsockopt broadcast");
@@ -46,7 +50,8 @@ void ServerNode::OpenMulticastSocket() {
   if (setsockopt(multicast_socket_, IPPROTO_IP, IP_MULTICAST_TTL, (void *) &optval, sizeof optval) <
       0)
     throw ("setsockopt multicast ttl");
-  ip_mreq_.imr_interface.s_addr = htonl(INADDR_ANY);
+
+  ip_mreq_.imr_interface.s_addr = htobe64(INADDR_ANY);
   if (inet_aton(mcast_addr_.c_str(), &ip_mreq_.imr_multiaddr) == 0)
     throw ("inet_aton");
   if (setsockopt(multicast_socket_, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *) &ip_mreq_,
@@ -57,7 +62,7 @@ void ServerNode::OpenMulticastSocket() {
     throw ("setsockopt");
   }
   server_address_.sin_family = AF_INET; // IPv4
-  server_address_.sin_addr.s_addr = htonl(INADDR_ANY); // listening on all interfaces
+  server_address_.sin_addr.s_addr = htobe64(INADDR_ANY); // listening on all interfaces
   server_address_.sin_port = htons(cmd_port_); // default port for receiving is PORT_NUM
 
   if (bind(multicast_socket_, (sockaddr *) &server_address_, sizeof(server_address_)) < 0)
@@ -101,6 +106,23 @@ ServerNode::ServerNode(char **argv, int argc) {
   OpenMulticastSocket();
 //  AlternativeOpenSocket();
   IndexFiles();
+
+  char hostbuffer[100];
+  char *IPbuffer;
+  struct hostent *host_entry;
+  int hostname;
+  // To retrieve hostname
+  hostname = gethostname(hostbuffer, 30);
+
+  // To retrieve host information
+  host_entry = gethostbyname(hostbuffer);
+  // To convert an Internet network
+  // address into ASCII string
+
+  IPbuffer = inet_ntoa(*((struct in_addr *)
+      host_entry->h_addr_list[0]));
+  ip=std::string(IPbuffer);
+  std::cout <<ip<<"\n";
 }
 void ServerNode::StartWorking() {
   log_message("Started working");
@@ -140,10 +162,9 @@ void ServerNode::IndexFiles() {
 void ServerNode::Discover(Command *command) {
   log_message("Started Discover");
 
-  char ip[100];
-  gethostname(ip, 100);
   std::string good = "GOOD_DAY";
-  ComplexCommand response(good, command->GetSeq(), (uint64_t) free_space_, mcast_addr_);
+  ComplexCommand response(good, command->GetSeq(), (uint64_t) free_space_, ip);
+  auto h = response.GetData();
   log_message("Sending response");
 
   response.SendTo(multicast_socket_,
@@ -155,4 +176,7 @@ void ServerNode::Discover(Command *command) {
   log_message("Finished Discover");
 
 }
+
+
+
 

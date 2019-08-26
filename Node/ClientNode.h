@@ -12,7 +12,7 @@
 class ClientNode {
  private:
   void OpenMultiacastSocket();
-  void ParseArguments(char ** argsv, int argc);
+  void ParseArguments(char **argsv, int argc);
  public:
   struct sockaddr_in client_address_;
   struct sockaddr_in server_address_;

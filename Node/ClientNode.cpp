@@ -44,7 +44,7 @@ void ClientNode::OpenMultiacastSocket() {
 
   /* podpięcie się do grupy rozsyłania (ang. multicast) */
   struct ip_mreq mreq;
-  mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+  mreq.imr_interface.s_addr = htobe64(INADDR_ANY);
   if (inet_aton(mcast_addr_.c_str(), &mreq.imr_multiaddr) == 0)
     throw ("inet_aton");
   if (setsockopt(multicast_socket_, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *) &mreq,
@@ -52,7 +52,7 @@ void ClientNode::OpenMultiacastSocket() {
     throw ("setsockopt");
 
   client_address_.sin_family = AF_INET;
-  client_address_.sin_addr.s_addr = htonl(INADDR_ANY);
+  client_address_.sin_addr.s_addr = htobe64(INADDR_ANY);
   client_address_.sin_port = htons(0);
 
   server_address_.sin_family = AF_INET;
@@ -83,6 +83,7 @@ void ClientNode::Discover() {
   ComplexCommand response_message(multicast_socket_,
                                   0,
                                   reinterpret_cast<struct sockadrr_in *>(&server_address_),
+                                  send_seq,
                                   sizeof(client_address_));
 
   while (response_message.GetLen() > 0) {
@@ -98,7 +99,6 @@ void ClientNode::Discover() {
 
   }
   log_message("Discover end");
-
 }
 
 ClientNode::ClientNode(char **argsv, int argc) {

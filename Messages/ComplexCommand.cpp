@@ -10,13 +10,17 @@
 ComplexCommand::ComplexCommand(std::string &cmd,
                                uint64_t cmd_seq,
                                uint64_t param,
-                               std::string &data) : Command(cmd, cmd_seq, data, (int)sizeof(uint64_t)) {
-  memcpy((char *)SeqBegin()+sizeof(uint64_t), (void *) &param, sizeof(param));
+                               std::string &data) : Command(cmd,
+                                                            cmd_seq,
+                                                            data,
+                                                            (int) sizeof(uint64_t)) {
+  param = htobe64(param);
+  memcpy((char *) SeqBegin() + sizeof(uint64_t), (void *) &param, sizeof(param));
 }
 
 int ComplexCommand::DataBegin() {
   return 10 + 2 * sizeof(uint64_t);
 }
 uint64_t ComplexCommand::GetParam() {
-  return *(uint64_t  *)((char *)SeqBegin()+ sizeof(uint64_t));
+  return be64toh(*(uint64_t *) ((char *) SeqBegin() + sizeof(uint64_t)));
 }

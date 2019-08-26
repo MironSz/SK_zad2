@@ -4,6 +4,6 @@
 
 #include <iostream>
 #include "Lib.h"
-void log_message(std::string message){
-  std::cout<< message <<"\n";
+void log_message(std::string message) {
+  std::cout << message << "\n";
 }
