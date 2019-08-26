@@ -17,10 +17,11 @@ class ServerNode {
 
   std::vector<std::string> files;
   void OpenMulticastSocket();
+  void AlternativeOpenSocket();
   void ParseArguments(char ** argsv, int argc);
  public:
-  struct sockaddr_in client_address_;
-  struct sockaddr_in server_address_;
+  sockaddr_in client_address_;
+  sockaddr_in server_address_;
   std::string mcast_addr_;
   int multicast_socket_;
   int cmd_port_;

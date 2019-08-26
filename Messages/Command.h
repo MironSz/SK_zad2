@@ -21,8 +21,16 @@ class Command {
 
  public:
   Command(std::string buffor) : buffor_(buffor) {};
-  static Command *ReadCommand(int socket, int flags, struct sockadrr_in *src_addr, uint64_t seq_nr);
-  Command(int socket, int flags, struct sockadrr_in *src_addr, uint64_t seq_nr);
+  static Command *ReadCommand(int socket,
+                              int flags,
+                              struct sockadrr_in *src_addr,
+                              uint64_t seq_nr,
+                              socklen_t rcva_len);
+  Command(int socket,
+          int flags,
+          struct sockadrr_in *src_addr,
+          uint64_t seq_nr,
+          socklen_t rcva_len = sizeof(sockaddr));
   Command(std::string cmd, uint64_t cmd_seq, std::string data, int data_begin);
   std::string GetData();
   std::string GetCommand();

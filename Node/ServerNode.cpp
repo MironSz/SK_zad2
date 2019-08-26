@@ -23,6 +23,8 @@ using namespace boost::program_options;
 #define DEFAULT_SPACE 1000
 //#define DEFAULT_SPACE 52428800
 
+
+
 void ServerNode::OpenMulticastSocket() {
   int optval;
   /* otworzenie gniazda */
@@ -36,7 +38,7 @@ void ServerNode::OpenMulticastSocket() {
   /*Wiele serweróœ na jednej maszynie */
 //    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &(int) {1}, sizeof(int)) < 0)
 //        syserr("setsockopt(SO_REUSEADDR) failed");
-  /* podpięcie się do grupy rozsyłania (ang. multicast) */
+  /*Podpięcie się do grupy rozsyłania (ang. multicast) */
   optval = 1;
   if (setsockopt(multicast_socket_, SOL_SOCKET, SO_BROADCAST, (void *) &optval, sizeof optval) < 0)
     throw ("setsockopt broadcast");
@@ -56,10 +58,9 @@ void ServerNode::OpenMulticastSocket() {
   }
   server_address_.sin_family = AF_INET; // IPv4
   server_address_.sin_addr.s_addr = htonl(INADDR_ANY); // listening on all interfaces
-  server_address_.sin_port = htons(
-      cmd_port_); // default port for receiving is PORT_NUM
+  server_address_.sin_port = htons(cmd_port_); // default port for receiving is PORT_NUM
 
-  if (bind(multicast_socket_, (struct sockaddr *) &server_address_, sizeof(server_address_)) < 0)
+  if (bind(multicast_socket_, (sockaddr *) &server_address_, sizeof(server_address_)) < 0)
     throw ("bind");
 }
 void ServerNode::ParseArguments(char **argv, int argc) {
@@ -98,6 +99,7 @@ void ServerNode::ParseArguments(char **argv, int argc) {
 ServerNode::ServerNode(char **argv, int argc) {
   ParseArguments(argv, argc);
   OpenMulticastSocket();
+//  AlternativeOpenSocket();
   IndexFiles();
 }
 void ServerNode::StartWorking() {
@@ -106,14 +108,14 @@ void ServerNode::StartWorking() {
   while (true) {
     Command *request = Command::ReadCommand(multicast_socket_,
                                             0,
-                                            reinterpret_cast<struct sockadrr_in *>(&client_address_),
-                                            0);
+                                            reinterpret_cast< sockadrr_in *>(&client_address_),
+                                            0,
+                                            sizeof(sockaddr_in));
     log_message("Received request " + request->GetCommand());
-
 
     if (request->GetCommand() == "HELLO") {
       Discover(request);
-    } else if (request->GetCommand() == "qwertyuiop") {
+    } else if (request->GetCommand() == "SERVER_EMERGENCY_SHUTDOWN_PROTOCOL_OVER_9000") {
       break;
     }
 
@@ -122,7 +124,7 @@ void ServerNode::StartWorking() {
 }
 void ServerNode::IndexFiles() {
   DIR *dir;
-  struct dirent *ent;
+  dirent *ent;
   if ((dir = opendir(path_to_folder_.c_str())) != nullptr) {
     while ((ent = readdir(dir)) != nullptr) {
       if (ent->d_type == DT_REG) {

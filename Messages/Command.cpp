@@ -7,6 +7,10 @@
 #include "../Lib.h"
 #include "SimpleCommand.h"
 #include "ComplexCommand.h"
+#include <unistd.h>
+#include <netinet/in.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 int Command::GetLen() {
   return buffor_.length();
 }
@@ -38,27 +42,30 @@ void *Command::CmdBegin() {
   return (void *) (buffor_.data());
 }
 
-int Command::SendTo(int sock, int flags, const struct sockaddr *dest_addr, socklen_t addrlen) {
-  if (sendto(sock, buffor_.data(), buffor_.length(), 0, dest_addr, sizeof(*dest_addr))
-      != buffor_.length()) {
-//  TODO: Unable to send message
+int Command::SendTo(int sock, int flags, const sockaddr *dest_addr, socklen_t addrlen) {
+  auto bytes_sent = sendto(sock, (char *)buffor_.data(),(size_t) buffor_.length(), (int)flags,  dest_addr, addrlen);
+  if (bytes_sent != buffor_.length()) {
+    log_message("Unable to send message, error code : " + std::to_string(bytes_sent));
   }
   return buffor_.length();
 }
 
-Command::Command(int socket, int flags, struct sockadrr_in *src_addr, uint64_t seq_nr) {
+Command::Command(int socket,
+                 int flags,
+                 sockadrr_in *src_addr,
+                 uint64_t seq_nr,
+                 socklen_t rcva_len) {
   log_message("Command: Waiting for message");
   char inner_buffer[BUFFER_SIZE];
-  int rcva_len = (socklen_t) sizeof(src_addr);
 
-  int bytes_read = recvfrom(socket, inner_buffer, BUFFER_SIZE, 0, (struct sockaddr *) &src_addr,
-                            reinterpret_cast<socklen_t *>(&rcva_len));
-  log_message("Command: Received bytes "+std::to_string(bytes_read));
+  int bytes_read = recvfrom(socket, inner_buffer, BUFFER_SIZE, flags, (sockaddr *) &src_addr,
+                            (&rcva_len));
+  log_message("Command: Received bytes " + std::to_string(bytes_read));
 
   while (bytes_read > 0 && *(uint64_t *) (inner_buffer + CMD_LENGTH) != seq_nr
       && seq_nr != 0) {
-    bytes_read = recvfrom(socket, inner_buffer, BUFFER_SIZE, 0, (struct sockaddr *) &src_addr,
-                          reinterpret_cast<socklen_t *>(&rcva_len));
+    bytes_read =
+        recvfrom(socket, inner_buffer, BUFFER_SIZE, flags, (sockaddr *) &src_addr, (&rcva_len));
   }
   if (bytes_read > 0) {
     buffor_.resize(bytes_read);
@@ -70,14 +77,15 @@ Command::Command(int socket, int flags, struct sockadrr_in *src_addr, uint64_t s
 }
 Command *Command::ReadCommand(int socket,
                               int flags,
-                              struct sockadrr_in *src_addr,
-                              uint64_t seq_nr) {
-  Command *result = new SimpleCommand(socket, flags, src_addr, seq_nr);
+                              sockadrr_in *src_addr,
+                              uint64_t seq_nr,
+                              socklen_t rcva_len) {
+  Command *result = new SimpleCommand(socket, flags, src_addr, seq_nr, rcva_len);
 
   if (result->GetCommand() == "GOOD_DAY" ||
       result->GetCommand() == "ADD" ||
       result->GetCommand() == "CONNECT_ME" ||
-      result->GetCommand() == "CAN_ADD" ) {
+      result->GetCommand() == "CAN_ADD") {
     result = new ComplexCommand(result->buffor_);
   }
 

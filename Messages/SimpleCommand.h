@@ -20,8 +20,12 @@ class SimpleCommand : public Command {
   SimpleCommand(std::string buffor) : Command(buffor) {};
   SimpleCommand(const SimpleCommand &);
   SimpleCommand(std::string cmd, uint64_t cmd_seq, std::string data);
-  SimpleCommand(int socket, int flags, struct sockadrr_in *src_addr, uint64_t seq_nr) :
-      Command(socket, flags, src_addr, seq_nr) {};
+  SimpleCommand(int socket,
+                int flags,
+                struct sockadrr_in *src_addr,
+                uint64_t seq_nr,
+                socklen_t rcva_len = sizeof(sockaddr)) :
+      Command(socket, flags, src_addr, seq_nr, rcva_len) {};
 
 };
 
