@@ -38,7 +38,7 @@ class ServerNode {
 //  void ConnectMcaddr();
   void Discover(Command *command);
   void Fetch(Command *command);
-  static void SendFile(Command *command, sockaddr_in client_addr);
+  static void SendFile(Command *command, sockaddr_in client_addr, int multicast_socket, std::string path_to_input_dir);
   void Search(Command *command);
   bool CheckIfFileExists(std::string filename);
 //  void Upload(std::string filename);

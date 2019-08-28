@@ -148,7 +148,7 @@ void ClientNode::Discover() {
                                   0,
                                   reinterpret_cast<struct sockadrr_in *>(&server_address_),
                                   send_seq,
-                                  sizeof(client_address_));
+                                  "GOOD_DAY");
 
   while (response_message.GetLen() > 0) {
     log_message("Processing response " + response_message.GetCommand());
@@ -157,7 +157,8 @@ void ClientNode::Discover() {
     response_message = ComplexCommand(multicast_socket_,
                                       0,
                                       reinterpret_cast<struct sockadrr_in *>(&server_address_),
-                                      send_seq);
+                                      send_seq,
+                                      "GOOD_DAY");
   }
   log_message("Discover end");
 }
@@ -173,7 +174,7 @@ void ClientNode::Search(std::string filename) {
                                  0,
                                  reinterpret_cast<struct sockadrr_in *>(&last_server),
                                  seq,
-                                 sizeof(client_address_));
+                                 "MY_LIST");
   while (response_message.GetLen() > 0) {
     std::stringstream data(response_message.GetData());
     std::string filename;
@@ -186,7 +187,7 @@ void ClientNode::Search(std::string filename) {
                                      0,
                                      reinterpret_cast<struct sockadrr_in *>(&last_server),
                                      seq,
-                                     sizeof(client_address_));
+                                     "MY_LIST");
   }
 
 }
@@ -194,6 +195,7 @@ void ClientNode::Fetch(std::string filename) {
   if (remembered_files.find(filename) == remembered_files.end()) {
 //    TODO: Log exceptions or sth
     log_message("Could  not find the file\n");
+    return;
   }
   uint64_t seq_nr = 3;
   SimpleCommand request("GET", seq_nr, filename);
@@ -205,7 +207,11 @@ void ClientNode::Fetch(std::string filename) {
                           0,
                           reinterpret_cast<struct sockadrr_in *>(&server_address_),
                           seq_nr,
-                          sizeof(sockaddr_in));
+                          "CONNECT_ME");
+  if(response.GetLen()==0){
+    log_message("Did not receive response");
+    return;
+  }
   log_message("Received response " + response.GetCommand() + " " + response.GetData() + "  "
                   + std::to_string(response.GetParam()));
 

@@ -26,11 +26,13 @@ class Command {
                               int flags,
                               struct sockadrr_in *src_addr,
                               uint64_t seq_nr,
+                              std::string expected_command,
                               socklen_t rcva_len);
   Command(int socket,
           int flags,
           struct sockadrr_in *src_addr,
           uint64_t seq_nr,
+          std::string expected_command,
           socklen_t rcva_len = sizeof(sockaddr_in));
   Command(std::string cmd, uint64_t cmd_seq, std::string data, int data_begin);
   std::string GetData();

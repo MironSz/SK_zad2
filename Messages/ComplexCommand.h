@@ -15,8 +15,9 @@ class ComplexCommand : public Command {
                  int flags,
                  sockadrr_in *src_addr,
                  uint64_t seq_nr,
-                 socklen_t rcva_len = sizeof(sockaddr)) :
-      Command(socket, flags, src_addr, seq_nr, rcva_len) {}
+                 std::string expected_command,
+                 socklen_t rcva_len = sizeof(sockaddr_in)) :
+      Command(socket, flags, src_addr, seq_nr,expected_command, rcva_len) {}
 
   ComplexCommand(std::string &cmd,
                  uint64_t cmd_seq,

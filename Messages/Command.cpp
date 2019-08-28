@@ -31,7 +31,7 @@ Command::Command(std::string cmd, uint64_t cmd_seq, std::string data, int param_
 //  Set cmd_seq
   memcpy(SeqBegin(), (void *) &cmd_seq, sizeof(cmd_seq));
 //  Set data
-  memcpy((char *) SeqBegin() +sizeof(uint64_t)+ param_size, data.data(), data.length());
+  memcpy((char *) SeqBegin() + sizeof(uint64_t) + param_size, data.data(), data.length());
 }
 uint64_t Command::GetSeq() {
   return htobe64(*(uint64_t *) SeqBegin());
@@ -56,10 +56,22 @@ int Command::SendTo(int sock, int flags, const sockaddr *dest_addr, socklen_t ad
   return buffor_.length();
 }
 
+bool CheckCommand(std::string expected_command, std::string buffor) {
+  if (buffor.length() < CMD_LENGTH+sizeof(uint64_t)) {
+    return false;
+  }
+  if(expected_command=="")
+    return true;
+  expected_command.resize(CMD_LENGTH, 0);
+  buffor.resize(CMD_LENGTH);
+
+  return buffor == expected_command;
+}
 Command::Command(int socket,
                  int flags,
                  sockadrr_in *src_addr,
                  uint64_t seq_nr,
+                 std::string expected_command,
                  socklen_t rcva_len) {
   rcva_len = sizeof(sockaddr_in);
   log_message("Command: Waiting for message");
@@ -70,8 +82,10 @@ Command::Command(int socket,
                             (&rcva_len));
   log_message("Command: Received bytes " + std::to_string(bytes_read));
 
-  while (bytes_read > 0 && be64toh(*(uint64_t *) (inner_buffer + CMD_LENGTH)) != seq_nr
-      && seq_nr != 0) {
+  while (bytes_read > 0 &&
+      be64toh(*(uint64_t *) (inner_buffer + CMD_LENGTH)) != seq_nr
+      && seq_nr != 0 &&
+      CheckCommand(expected_command, std::string(buffor_))) {
     log_message("Rereading the message because of reasons");
     bytes_read =
         recvfrom(socket, inner_buffer, BUFFER_SIZE, flags, (sockaddr *) &src_addr, (&rcva_len));
@@ -88,8 +102,9 @@ Command *Command::ReadCommand(int socket,
                               int flags,
                               sockadrr_in *src_addr,
                               uint64_t seq_nr,
+                              std::string expected_command,
                               socklen_t rcva_len) {
-  Command *result = new SimpleCommand(socket, flags, src_addr, seq_nr, rcva_len);
+  Command *result = new SimpleCommand(socket, flags, src_addr, seq_nr, expected_command, rcva_len);
 
   if (result->GetCommand() == "GOOD_DAY" ||
       result->GetCommand() == "ADD" ||

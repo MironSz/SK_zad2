@@ -24,8 +24,9 @@ class SimpleCommand : public Command {
                 int flags,
                 struct sockadrr_in *src_addr,
                 uint64_t seq_nr,
+                std::string expected_command,
                 socklen_t rcva_len = sizeof(sockaddr)) :
-      Command(socket, flags, src_addr, seq_nr, rcva_len) {};
+      Command(socket, flags, src_addr, seq_nr, expected_command, rcva_len) {};
 
 };
 

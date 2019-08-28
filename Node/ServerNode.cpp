@@ -14,6 +14,7 @@
 #include <sys/socket.h>
 #include <regex>
 #include <netdb.h>
+#include <fstream>
 #include "dirent.h"
 
 using namespace boost::program_options;
@@ -132,6 +133,7 @@ void ServerNode::StartWorking() {
                                             0,
                                             reinterpret_cast< sockadrr_in *>(&client_address_),
                                             0,
+                                            "",
                                             sizeof(sockaddr_in));
     log_message("Received request " + request->GetCommand());
 
@@ -223,7 +225,11 @@ void ServerNode::Fetch(Command *command) {
   if (!CheckIfFileExists(filename)) {
     log_message("Such file does not exist");
   }
-  detached_threads_.emplace_back(SendFile, command, client_address_);
+  detached_threads_.emplace_back(SendFile,
+                                 command,
+                                 client_address_,
+                                 multicast_socket_,
+                                 path_to_folder_);
 }
 bool ServerNode::CheckIfFileExists(std::string filename) {
   for (auto &file : files) {
@@ -233,8 +239,11 @@ bool ServerNode::CheckIfFileExists(std::string filename) {
   }
   return false;
 }
-void ServerNode::SendFile(Command *command, sockaddr_in client_addr) {
-  log_message("Sending file in new thread");
+void ServerNode::SendFile(Command *command,
+                          sockaddr_in client_addr,
+                          int multicast_socket,
+                          std::string path_to_input_dir) {
+  log_message("Sending file in new thread " + command->GetData() + " " + path_to_input_dir);
   sockaddr_in server_address;
   std::string filename = command->GetData();
   std::string s_connect_me = "CONNECT_ME";
@@ -253,10 +262,17 @@ void ServerNode::SendFile(Command *command, sockaddr_in client_addr) {
   log_message("Opened port " + std::to_string(opened_port));
 
   ComplexCommand connect_me(s_connect_me, command->GetSeq(), opened_port, filename);
-//  log_message("Opened port " + std::to_string(opened_port));
 
-  connect_me.SendTo(sock, 0, reinterpret_cast<sockaddr *> (&client_addr), sizeof(client_addr));
-  log_message("Send \"CONNECT_ME\" message");
+  connect_me.SendTo(multicast_socket,
+                    0,
+                    reinterpret_cast<sockaddr *> (&client_addr),
+                    sizeof(client_addr));
+  log_message("Sent \"CONNECT_ME\" message");
+
+  std::ifstream t(path_to_input_dir+"/"+filename);
+  std::string str((std::istreambuf_iterator<char>(t)),
+                  std::istreambuf_iterator<char>());
+  log_message("Opened file:\n"+str);
 
 }
 
