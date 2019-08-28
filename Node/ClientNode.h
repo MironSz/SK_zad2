@@ -13,7 +13,8 @@
 #include <sys/socket.h>
 #include <thread>
 #include "../Messages/ComplexCommand.h"
-class ClientNode {
+#include "Node.h"
+class ClientNode : public Node{
  private:
   std::list<std::thread> detached_threads;
   std::map<std::string, sockaddr_in> remembered_files;
@@ -38,10 +39,7 @@ class ClientNode {
 //  void Upload(std::string filename);
 //  void Remove(std::string filename);
 //  void Exit();
-  static void ReceiveFile(ComplexCommand command,
-                          sockaddr_in server_addr,
-                          std::string path_to_dir,
-                          std::string filename);
+
 };
 
 #endif //UNTITLED__CLIENTNODE_H_

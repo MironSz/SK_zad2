@@ -13,14 +13,14 @@
 #include <sys/socket.h>
 #include <thread>
 #include "../Messages/Command.h"
-class ServerNode {
+#include "Node.h"
+class ServerNode : public Node{
  private:
   std::list<std::thread> detached_threads_;
   ip_mreq ip_mreq_;
   std::string ip;
   std::vector<std::string> files;
   void OpenMulticastSocket();
-  void AlternativeOpenSocket();
   void ParseArguments(char **argsv, int argc);
  public:
   sockaddr_in client_address_;
@@ -38,7 +38,6 @@ class ServerNode {
 //  void ConnectMcaddr();
   void Discover(Command *command);
   void Fetch(Command *command);
-  static void SendFile(Command *command, sockaddr_in client_addr, int multicast_socket, std::string path_to_input_dir);
   void Search(Command *command);
   bool CheckIfFileExists(std::string filename);
 //  void Upload(std::string filename);

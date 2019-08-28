@@ -10,6 +10,8 @@ set(SOURCE_FILES
         Lib.cpp
         Node/ClientNode.cpp
         Node/ClientNode.h
+        Node/Node.cpp
+        Node/Node.h
         Node/ServerNode.cpp
         Node/ServerNode.h
         Messages/ComplexCommand.h

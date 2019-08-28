@@ -225,34 +225,16 @@ void ServerNode::Fetch(Command *command) {
   if (!CheckIfFileExists(filename)) {
     log_message("Such file does not exist");
   }
-  detached_threads_.emplace_back(SendFile,
-                                 command,
-                                 client_address_,
-                                 multicast_socket_,
-                                 path_to_folder_);
-}
-bool ServerNode::CheckIfFileExists(std::string filename) {
-  for (auto &file : files) {
-    if (file == filename) {
-      return true;
-    }
-  }
-  return false;
-}
-void ServerNode::SendFile(Command *command,
-                          sockaddr_in client_addr,
-                          int multicast_socket,
-                          std::string path_to_input_dir) {
-  log_message("Sending file in new thread " + command->GetData() + " " + path_to_input_dir);
+
+  log_message("Sending file in new thread " + command->GetData() + " " + path_to_folder_);
   sockaddr_in server_address;
-  std::string filename = command->GetData();
   std::string s_connect_me = "CONNECT_ME";
   int sock = socket(PF_INET, SOCK_STREAM, 0); // creating IPv4 TCP socket
 
   server_address.sin_family = AF_INET; // IPv4
   server_address.sin_addr.s_addr = htonl(INADDR_ANY); //
   server_address.sin_port = htons(0); // listening on port PORT_NUM
-  socklen_t addr_len = sizeof(client_addr);
+  socklen_t addr_len = sizeof(client_address_);
   if (bind(sock, reinterpret_cast<sockaddr * > (&server_address), addr_len) < 0 ||
       getsockname(sock, reinterpret_cast<sockaddr * > (&server_address), &addr_len) < 0) {
 //    TODO:
@@ -263,36 +245,23 @@ void ServerNode::SendFile(Command *command,
 
   ComplexCommand connect_me(s_connect_me, command->GetSeq(), opened_port, filename);
 
-  connect_me.SendTo(multicast_socket,
+  connect_me.SendTo(multicast_socket_,
                     0,
-                    reinterpret_cast<sockaddr *> (&client_addr),
-                    sizeof(client_addr));
+                    reinterpret_cast<sockaddr *> (&client_address_),
+                    sizeof(client_address_));
+
   log_message("Sent \"CONNECT_ME\" message");
 
-  std::ifstream t(path_to_input_dir + "/" + filename);
-  std::string file_str((std::istreambuf_iterator<char>(t)),
-                       std::istreambuf_iterator<char>());
-  log_message("Opened file:\n" + file_str);
-  int already_send_bytes = 0;
-  int sent_bytes = 1;
-  while (already_send_bytes < file_str.length() && sent_bytes > 0) {
-    log_message("Sending tcp packet");
-    sent_bytes = sendto(sock,
-                        file_str.c_str() + already_send_bytes,
-                        file_str.length() - already_send_bytes,
-                        0,
-                        reinterpret_cast<sockaddr *>(&client_addr),
-                        sizeof(client_addr));
-    if (sent_bytes) {
-//      TODO: handle error
-      log_message("Unable to send tcp packet");
-    } else {
-      log_message("Sent tcp packet");
-    }
-    already_send_bytes += sent_bytes;
-  }
-  log_message("Finished sending tcp packets");
+  detached_threads_.emplace_back(Node::SendFile, server_address, path_to_folder_, filename);
+}
 
+bool ServerNode::CheckIfFileExists(std::string filename) {
+  for (auto &file : files) {
+    if (file == filename) {
+      return true;
+    }
+  }
+  return false;
 }
 
 

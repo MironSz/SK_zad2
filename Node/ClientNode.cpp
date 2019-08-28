@@ -217,32 +217,22 @@ void ClientNode::Fetch(std::string filename) {
   }
   log_message("Received response " + response.GetCommand() + " " + response.GetData() + "  "
                   + std::to_string(response.GetParam()));
-  detached_threads.emplace_back(ReceiveFile, response, server_addr, path_to_folder_, filename);
-}
-void ClientNode::ReceiveFile(ComplexCommand command,
-                             sockaddr_in server_addr,
-                             std::string path_to_dir,
-                             std::string filename) {
-  char buffer[1000];
-  std::ofstream output_stream(path_to_dir + "/" + filename);
+
+  sockaddr_in server_address = server_address_;
   int sock = socket(PF_INET, SOCK_STREAM, 0); // creating IPv4 TCP socket
   socklen_t addr_len = sizeof(sockaddr_in);
   server_addr.sin_family = AF_INET; // IPv4
   server_addr.sin_addr.s_addr = htonl(INADDR_ANY); //
-  server_addr.sin_port = htons(command.GetParam()); // listening on port PORT_NUM
+  server_addr.sin_port = htons(response.GetParam()); // listening on port PORT_NUM
   if (bind(sock, reinterpret_cast<sockaddr * > (&server_addr), addr_len) < 0) {
 //    TODO:
     log_message("Could not open socket");
   } else {
     log_message("Opened the tcp socket");
   }
-  int number_of_received_bytes;
-  do {
-    number_of_received_bytes =
-        recvfrom(sock, buffer, 1000, 0, reinterpret_cast<sockaddr *>(&server_addr), &addr_len);
-    std::string received_bytes(buffer, number_of_received_bytes);
-  } while (number_of_received_bytes > 0);
 
+  detached_threads.emplace_back(Node::ReceiveFile,sock,server_addr,path_to_folder_,filename);
 }
+
 
 
