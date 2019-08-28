@@ -3,6 +3,7 @@
 //
 #include <boost/program_options.hpp>
 #include <iostream>
+#include <fstream>
 #include <cctype>
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -198,25 +199,50 @@ void ClientNode::Fetch(std::string filename) {
     return;
   }
   uint64_t seq_nr = 3;
+  sockaddr_in server_addr = server_address_;
   SimpleCommand request("GET", seq_nr, filename);
   request.SendTo(multicast_socket_,
                  0,
                  reinterpret_cast<sockaddr *>(&remembered_files[filename]),
                  sizeof(sockaddr_in));
+
   ComplexCommand response(multicast_socket_,
                           0,
                           reinterpret_cast<struct sockadrr_in *>(&server_address_),
                           seq_nr,
                           "CONNECT_ME");
-  if(response.GetLen()==0){
+  if (response.GetLen() == 0) {
     log_message("Did not receive response");
     return;
   }
   log_message("Received response " + response.GetCommand() + " " + response.GetData() + "  "
                   + std::to_string(response.GetParam()));
+  detached_threads.emplace_back(ReceiveFile, response, server_addr, path_to_folder_, filename);
+}
+void ClientNode::ReceiveFile(ComplexCommand command,
+                             sockaddr_in server_addr,
+                             std::string path_to_dir,
+                             std::string filename) {
+  char buffer[1000];
+  std::ofstream output_stream(path_to_dir + "/" + filename);
+  int sock = socket(PF_INET, SOCK_STREAM, 0); // creating IPv4 TCP socket
+  socklen_t addr_len = sizeof(sockaddr_in);
+  server_addr.sin_family = AF_INET; // IPv4
+  server_addr.sin_addr.s_addr = htonl(INADDR_ANY); //
+  server_addr.sin_port = htons(command.GetParam()); // listening on port PORT_NUM
+  if (bind(sock, reinterpret_cast<sockaddr * > (&server_addr), addr_len) < 0) {
+//    TODO:
+    log_message("Could not open socket");
+  } else {
+    log_message("Opened the tcp socket");
+  }
+  int number_of_received_bytes;
+  do {
+    number_of_received_bytes =
+        recvfrom(sock, buffer, 1000, 0, reinterpret_cast<sockaddr *>(&server_addr), &addr_len);
+    std::string received_bytes(buffer, number_of_received_bytes);
+  } while (number_of_received_bytes > 0);
 
 }
-void ClientNode::SendFile(sockaddr_in server_addr, std::string filename) {
 
-}
 
