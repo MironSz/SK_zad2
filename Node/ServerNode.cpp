@@ -94,8 +94,8 @@ void ServerNode::ParseArguments(char **argv, int argc) {
   if (vm.count("b")) {
     free_space_ = vm["b"].as<int>();
   }
-  if (vm.count("o")) {
-    path_to_folder_ = vm["o"].as<std::string>();
+  if (vm.count("f")) {
+    path_to_folder_ = vm["f"].as<std::string>();
   }
   if (vm.count("t")) {
     timeout_ = vm["t"].as<int>();
@@ -121,8 +121,8 @@ ServerNode::ServerNode(char **argv, int argc) {
 
   IPbuffer = inet_ntoa(*((struct in_addr *)
       host_entry->h_addr_list[0]));
-  ip=std::string(IPbuffer);
-  std::cout <<ip<<"\n";
+  ip = std::string(IPbuffer);
+  std::cout << ip << "\n";
 }
 void ServerNode::StartWorking() {
   log_message("Started working");
@@ -137,6 +137,10 @@ void ServerNode::StartWorking() {
 
     if (request->GetCommand() == "HELLO") {
       Discover(request);
+    } else if (request->GetCommand() == "LIST") {
+      Search(request);
+    } else if (request->GetCommand() == "GET") {
+      Fetch(request);
     } else if (request->GetCommand() == "SERVER_EMERGENCY_SHUTDOWN_PROTOCOL_OVER_9000") {
       break;
     }
@@ -147,15 +151,18 @@ void ServerNode::StartWorking() {
 void ServerNode::IndexFiles() {
   DIR *dir;
   dirent *ent;
+  log_message("Indexing files in " + path_to_folder_);
   if ((dir = opendir(path_to_folder_.c_str())) != nullptr) {
     while ((ent = readdir(dir)) != nullptr) {
       if (ent->d_type == DT_REG) {
         std::string filename(ent->d_name);
         files.push_back(filename);
+        log_message("Indexed " + filename);
       }
     }
     closedir(dir);
   } else {
+    log_message("Could not open the directory");
 //    TODO: Could not open dir
   }
 }
@@ -174,6 +181,82 @@ void ServerNode::Discover(Command *command) {
   log_message("Sent response");
 
   log_message("Finished Discover");
+
+}
+void ServerNode::Search(Command *command) {
+  log_message("Started Search, looking for " + command->GetData());
+  std::string my_list = "MY_LIST";
+  std::string inner_buffer = "";
+  for (auto &file : files) {
+    if (file.find(command->GetData()) != std::string::npos) {
+      if (file.length() + inner_buffer.length() + 1
+          <= BUFFER_SIZE - CMD_LENGTH - sizeof(uint64_t)) {
+        inner_buffer += ("\n" + file);
+      } else {
+        log_message("Sending package");
+
+        SimpleCommand response(my_list, command->GetSeq(), inner_buffer);
+        response.SendTo(multicast_socket_,
+                        0,
+                        reinterpret_cast<const sockaddr *>(&client_address_),
+                        sizeof(client_address_));
+        inner_buffer = "";
+      }
+    }
+  }
+  if (!inner_buffer.empty()) {
+    log_message("Sending final package");
+
+    SimpleCommand response(my_list, command->GetSeq(), inner_buffer);
+    response.SendTo(multicast_socket_,
+                    0,
+                    reinterpret_cast<const sockaddr *>(&client_address_),
+                    sizeof(client_address_));
+    inner_buffer = "";
+  }
+  log_message("Finished Search");
+}
+
+void ServerNode::Fetch(Command *command) {
+  std::string filename = command->GetData();
+  log_message("Fetch " + filename);
+  if (!CheckIfFileExists(filename)) {
+    log_message("Such file does not exist");
+  }
+  detached_threads_.emplace_back(SendFile, command, client_address_);
+}
+bool ServerNode::CheckIfFileExists(std::string filename) {
+  for (auto &file : files) {
+    if (file == filename) {
+      return true;
+    }
+  }
+  return false;
+}
+void ServerNode::SendFile(Command *command, sockaddr_in client_addr) {
+  log_message("Sending file in new thread");
+  sockaddr_in server_address;
+  std::string filename = command->GetData();
+  std::string s_connect_me = "CONNECT_ME";
+  int sock = socket(PF_INET, SOCK_STREAM, 0); // creating IPv4 TCP socket
+
+  server_address.sin_family = AF_INET; // IPv4
+  server_address.sin_addr.s_addr = htonl(INADDR_ANY); //
+  server_address.sin_port = htons(0); // listening on port PORT_NUM
+  socklen_t addr_len = sizeof(client_addr);
+  if (bind(sock, reinterpret_cast<sockaddr * > (&server_address), addr_len) < 0 ||
+      getsockname(sock, reinterpret_cast<sockaddr * > (&server_address), &addr_len) < 0) {
+//    TODO:
+    log_message("Could not open socket");
+  }
+  uint64_t opened_port = server_address.sin_port;
+  log_message("Opened port " + std::to_string(opened_port));
+
+  ComplexCommand connect_me(s_connect_me, command->GetSeq(), opened_port, filename);
+//  log_message("Opened port " + std::to_string(opened_port));
+
+  connect_me.SendTo(sock, 0, reinterpret_cast<sockaddr *> (&client_addr), sizeof(client_addr));
+  log_message("Send \"CONNECT_ME\" message");
 
 }
 

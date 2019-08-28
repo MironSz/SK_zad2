@@ -63,44 +63,6 @@ void ClientNode::OpenMultiacastSocket() {
     throw "bind";
 }
 
-void ClientNode::Search(std::string filename) {
-
-}
-void ClientNode::Discover() {
-  log_message("Discover begin");
-  uint64_t send_seq = 1;// random_seq();
-  SimpleCommand request_message(std::string("HELLO"), send_seq, std::string(""));
-  log_message("Prepared message");
-
-  request_message.SendTo(multicast_socket_,
-                         0,
-                         reinterpret_cast<const sockaddr *>(&server_address_),
-                         sizeof(server_address_));
-
-  log_message("Sent message");
-
-//  int rcva_len = sizeof(client_address_);
-  ComplexCommand response_message(multicast_socket_,
-                                  0,
-                                  reinterpret_cast<struct sockadrr_in *>(&server_address_),
-                                  send_seq,
-                                  sizeof(client_address_));
-
-  while (response_message.GetLen() > 0) {
-    log_message("Processing response " + response_message.GetCommand());
-
-    printf("Found %s (%s) with free space %lu\n", response_message.GetData().c_str(),
-           inet_ntoa(server_address_.sin_addr), response_message.GetParam());
-
-    response_message = ComplexCommand(multicast_socket_,
-                                      0,
-                                      reinterpret_cast<struct sockadrr_in *>(&server_address_),
-                                      send_seq);
-
-  }
-  log_message("Discover end");
-}
-
 ClientNode::ClientNode(char **argsv, int argc) {
   ParseArguments(argsv, argc);
   OpenMultiacastSocket();
@@ -143,8 +105,9 @@ void ClientNode::ParseArguments(char **argv, int argc) {
 void ClientNode::StartWorking() {
   std::regex exit("^exit$");
   std::regex discover("^discover$");
-  std::regex fetch("^fetch (\\w*)$");
-  std::regex argument(" (\\w*)$");
+  std::regex fetch("^fetch\\s+(\\w*)$");
+  std::regex search("^search\\s+(\\w*)$");
+  std::regex argument("(\\w*)$");
   while (true) {
     std::smatch matched;
 
@@ -159,8 +122,95 @@ void ClientNode::StartWorking() {
     } else if (std::regex_search(command, matched, fetch)) {
       std::regex_search(command, matched, argument);
       std::cout << "fetch (" << matched[0] << ")\n";
+      Fetch(matched[0]);
+    } else if (std::regex_search(command, matched, search)) {
+      std::regex_search(command, matched, argument);
+      std::cout << "search (" << matched[0] << ")\n";
+      Search(matched[0]);
     }
-
   }
 
 }
+
+void ClientNode::Discover() {
+  log_message("Discover begin");
+  uint64_t send_seq = 1;// random_seq();
+  SimpleCommand request_message(std::string("HELLO"), send_seq, std::string(""));
+
+  request_message.SendTo(multicast_socket_,
+                         0,
+                         reinterpret_cast<const sockaddr *>(&server_address_),
+                         sizeof(server_address_));
+
+  log_message("Sent message");
+
+  ComplexCommand response_message(multicast_socket_,
+                                  0,
+                                  reinterpret_cast<struct sockadrr_in *>(&server_address_),
+                                  send_seq,
+                                  sizeof(client_address_));
+
+  while (response_message.GetLen() > 0) {
+    log_message("Processing response " + response_message.GetCommand());
+    printf("Found %s (%s) with free space %lu\n", response_message.GetData().c_str(),
+           inet_ntoa(server_address_.sin_addr), response_message.GetParam());
+    response_message = ComplexCommand(multicast_socket_,
+                                      0,
+                                      reinterpret_cast<struct sockadrr_in *>(&server_address_),
+                                      send_seq);
+  }
+  log_message("Discover end");
+}
+void ClientNode::Search(std::string filename) {
+  uint64_t seq = 2;
+  SimpleCommand request("LIST", seq, filename);
+  request.SendTo(multicast_socket_,
+                 0,
+                 reinterpret_cast<sockaddr *>(&server_address_),
+                 sizeof(server_address_));
+  sockaddr_in last_server;
+  SimpleCommand response_message(multicast_socket_,
+                                 0,
+                                 reinterpret_cast<struct sockadrr_in *>(&last_server),
+                                 seq,
+                                 sizeof(client_address_));
+  while (response_message.GetLen() > 0) {
+    std::stringstream data(response_message.GetData());
+    std::string filename;
+    while (std::getline(data, filename, '\n')) {
+      remembered_files[filename] = last_server;
+      printf("%s (%s)\n", filename.c_str(), inet_ntoa(last_server.sin_addr));
+    }
+
+    response_message = SimpleCommand(multicast_socket_,
+                                     0,
+                                     reinterpret_cast<struct sockadrr_in *>(&last_server),
+                                     seq,
+                                     sizeof(client_address_));
+  }
+
+}
+void ClientNode::Fetch(std::string filename) {
+  if (remembered_files.find(filename) == remembered_files.end()) {
+//    TODO: Log exceptions or sth
+    log_message("Could  not find the file\n");
+  }
+  uint64_t seq_nr = 3;
+  SimpleCommand request("GET", seq_nr, filename);
+  request.SendTo(multicast_socket_,
+                 0,
+                 reinterpret_cast<sockaddr *>(&remembered_files[filename]),
+                 sizeof(sockaddr_in));
+  ComplexCommand response(multicast_socket_,
+                          0,
+                          reinterpret_cast<struct sockadrr_in *>(&server_address_),
+                          seq_nr,
+                          sizeof(sockaddr_in));
+  log_message("Received response " + response.GetCommand() + " " + response.GetData() + "  "
+                  + std::to_string(response.GetParam()));
+
+}
+void ClientNode::SendFile(sockaddr_in server_addr, std::string filename) {
+
+}
+

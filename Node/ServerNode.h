@@ -6,13 +6,16 @@
 #define UNTITLED__SERVERNODE_H_
 #include <string>
 #include <vector>
+#include <list>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <thread>
 #include "../Messages/Command.h"
 class ServerNode {
  private:
+  std::list<std::thread> detached_threads_;
   ip_mreq ip_mreq_;
   std::string ip;
   std::vector<std::string> files;
@@ -34,8 +37,10 @@ class ServerNode {
   void IndexFiles();
 //  void ConnectMcaddr();
   void Discover(Command *command);
-//  void Search(std::string filename);
-//  void Fetch(std::string filename);
+  void Fetch(Command *command);
+  static void SendFile(Command *command, sockaddr_in client_addr);
+  void Search(Command *command);
+  bool CheckIfFileExists(std::string filename);
 //  void Upload(std::string filename);
 //  void Remove(std::string filename);
 };

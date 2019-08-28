@@ -5,12 +5,14 @@
 #ifndef UNTITLED__CLIENTNODE_H_
 #define UNTITLED__CLIENTNODE_H_
 #include <string>
+#include <map>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 class ClientNode {
  private:
+  std::map<std::string,sockaddr_in> remembered_files;
   void OpenMultiacastSocket();
   void ParseArguments(char **argsv, int argc);
  public:
@@ -29,9 +31,10 @@ class ClientNode {
   void Discover();
   void Search(std::string filename);
   void Fetch(std::string filename);
-  void Upload(std::string filename);
-  void Remove(std::string filename);
-  void Exit();
+//  void Upload(std::string filename);
+//  void Remove(std::string filename);
+//  void Exit();
+  void SendFile(sockaddr_in server_addr,std::string filename);
 };
 
 #endif //UNTITLED__CLIENTNODE_H_
