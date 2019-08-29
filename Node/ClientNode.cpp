@@ -218,11 +218,10 @@ void ClientNode::Fetch(std::string filename) {
   log_message("Received response " + response.GetCommand() + " " + response.GetData() + "  "
                   + std::to_string(response.GetParam()));
 
-  sockaddr_in server_address = server_address_;
   int sock = socket(PF_INET, SOCK_STREAM, 0); // creating IPv4 TCP socket
   socklen_t addr_len = sizeof(sockaddr_in);
   server_addr.sin_family = AF_INET; // IPv4
-  server_addr.sin_addr.s_addr = htonl(INADDR_ANY); //
+  server_addr.sin_addr = server_address_.sin_addr; //
   server_addr.sin_port = htons(response.GetParam()); // listening on port PORT_NUM
   if (bind(sock, reinterpret_cast<sockaddr * > (&server_addr), addr_len) < 0) {
 //    TODO:
@@ -230,8 +229,12 @@ void ClientNode::Fetch(std::string filename) {
   } else {
     log_message("Opened the tcp socket");
   }
-
-  detached_threads.emplace_back(Node::ReceiveFile,sock,server_addr,path_to_folder_,filename);
+  int msg_sock = connect(sock, reinterpret_cast<sockaddr *>(&server_addr), addr_len);
+  detached_threads.emplace_back(Node::ReceiveFile,
+                                msg_sock,
+                                server_addr,
+                                path_to_folder_,
+                                filename);
 }
 
 

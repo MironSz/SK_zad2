@@ -19,6 +19,7 @@ void Node::SendFile(int sock,
                     sockaddr_in dest_addr,
                     std::string path_to_dir,
                     std::string filename) {
+  int listen_result = listen(sock,10);
   log_message("Sending " + path_to_dir + "/" + filename);
   std::ifstream t(path_to_dir + "/" + filename);
   std::string file_str((std::istreambuf_iterator<char>(t)),
@@ -26,14 +27,12 @@ void Node::SendFile(int sock,
   log_message("File contents\n" + file_str);
   int already_send_bytes = 0;
   int sent_bytes = 1;
-  while (already_send_bytes < file_str.length() && sent_bytes > 0) {
+  while ((unsigned int) already_send_bytes < file_str.length() && sent_bytes > 0) {
     log_message("Sending tcp packet");
-    sent_bytes = sendto(sock,
+    sent_bytes = send(sock,
                         file_str.c_str() + already_send_bytes,
                         file_str.length() - already_send_bytes,
-                        0,
-                        reinterpret_cast<sockaddr *>(&dest_addr),
-                        sizeof(dest_addr));
+                        0);
     if (sent_bytes) {
 //      TODO: handle error
       log_message("Unable to send tcp packet");
@@ -60,7 +59,7 @@ void Node::ReceiveFile(int sock,
   int number_of_received_bytes;
   do {
     number_of_received_bytes =
-        recvfrom(sock, buffer, 1000, 0, reinterpret_cast<sockaddr *>(&client_addr), &addr_len);
+        recv(sock, buffer, 1000, 0);
     if (number_of_received_bytes > 0) {
       std::string received_bytes(buffer, number_of_received_bytes);
       log_message("Writing (" + received_bytes + ")to file");

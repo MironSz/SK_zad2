@@ -111,9 +111,8 @@ ServerNode::ServerNode(char **argv, int argc) {
   char hostbuffer[100];
   char *IPbuffer;
   struct hostent *host_entry;
-  int hostname;
   // To retrieve hostname
-  hostname = gethostname(hostbuffer, 30);
+  gethostname(hostbuffer, 30);
 
   // To retrieve host information
   host_entry = gethostbyname(hostbuffer);
@@ -250,9 +249,18 @@ void ServerNode::Fetch(Command *command) {
                     reinterpret_cast<sockaddr *> (&client_address_),
                     sizeof(client_address_));
 
-  log_message("Sent \"CONNECT_ME\" message");
+  log_message("Sent \"CONNECT_ME\" message, attempting to establish connection");
 
-  detached_threads_.emplace_back(Node::SendFile, server_address, path_to_folder_, filename);
+  log_message("Deataching trhead");
+  sockaddr_in client_addr = client_address_;
+  client_addr.sin_port = server_address.sin_port;
+  int msg_sock = accept(sock, (struct sockaddr *) &client_addr, &addr_len);
+
+  detached_threads_.emplace_back(Node::SendFile,
+                                 msg_sock,
+                                 client_addr,
+                                 path_to_folder_,
+                                 filename);
 }
 
 bool ServerNode::CheckIfFileExists(std::string filename) {
