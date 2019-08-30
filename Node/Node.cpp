@@ -60,6 +60,7 @@ void Node::ReceiveFile(int sock,
   do {
     number_of_received_bytes =
         recv(sock, buffer, 1000, 0);
+    log_message("Received package");
     if (number_of_received_bytes > 0) {
       std::string received_bytes(buffer, number_of_received_bytes);
       log_message("Writing (" + received_bytes + ")to file");

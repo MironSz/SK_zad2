@@ -15,6 +15,7 @@
 #include <regex>
 #include <netdb.h>
 #include <fstream>
+#include <poll.h>
 #include "dirent.h"
 
 using namespace boost::program_options;
@@ -223,6 +224,7 @@ void ServerNode::Fetch(Command *command) {
   log_message("Fetch " + filename);
   if (!CheckIfFileExists(filename)) {
     log_message("Such file does not exist");
+    return;
   }
 
   log_message("Sending file in new thread " + command->GetData() + " " + path_to_folder_);
@@ -238,11 +240,17 @@ void ServerNode::Fetch(Command *command) {
       getsockname(sock, reinterpret_cast<sockaddr * > (&server_address), &addr_len) < 0) {
 //    TODO:
     log_message("Could not open socket");
+    return;
   }
-  uint64_t opened_port = server_address.sin_port;
+  uint64_t opened_port = be64toh(server_address.sin_port);
   log_message("Opened port " + std::to_string(opened_port));
 
   ComplexCommand connect_me(s_connect_me, command->GetSeq(), opened_port, filename);
+  if (listen(sock, 1) < 0) {
+    log_message("Couldn't start listening");
+    return;
+  } else
+    log_message("Started listening");
 
   connect_me.SendTo(multicast_socket_,
                     0,
@@ -251,11 +259,36 @@ void ServerNode::Fetch(Command *command) {
 
   log_message("Sent \"CONNECT_ME\" message, attempting to establish connection");
 
-  log_message("Deataching trhead");
-  sockaddr_in client_addr = client_address_;
+  sockaddr_in client_addr = server_address;
   client_addr.sin_port = server_address.sin_port;
-  int msg_sock = accept(sock, (struct sockaddr *) &client_addr, &addr_len);
+  log_message("Accetping connections on " + std::to_string(client_addr.sin_port) + " "
+                  + std::to_string(client_addr.sin_addr.s_addr));
 
+  pollfd pfd;
+  pfd.fd = sock;
+  pfd.events = POLLIN;
+  int ret = poll(&pfd, 1, timeout_ * 1000);
+  if (ret < 0) {
+    log_message("Poll failed");
+    return;
+  } else if (ret == 0) {
+    log_message("Client did not connect");
+    return;
+  }
+  int msg_sock = accept(sock, (struct sockaddr *) &client_addr, &addr_len);
+  if (msg_sock >= 0)
+    log_message("Accepted connection");
+  else {
+    log_message("Did not accept connection");
+    return;
+  }
+
+  struct timeval tv;
+
+  tv.tv_sec = timeout_;  /* 30 Secs Timeout */
+  setsockopt(msg_sock, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *) &tv, sizeof(struct timeval));
+
+  log_message("Detaching thread");
   detached_threads_.emplace_back(Node::SendFile,
                                  msg_sock,
                                  client_addr,
