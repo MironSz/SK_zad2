@@ -19,20 +19,19 @@ void Node::SendFile(int sock,
                     sockaddr_in dest_addr,
                     std::string path_to_dir,
                     std::string filename) {
-  int listen_result = listen(sock,10);
+//  int listen_result = listen(sock,10);
   log_message("Sending " + path_to_dir + "/" + filename);
   std::ifstream t(path_to_dir + "/" + filename);
   std::string file_str((std::istreambuf_iterator<char>(t)),
                        std::istreambuf_iterator<char>());
-  log_message("File contents\n" + file_str);
+  log_message("File contents:\n" + file_str);
   int already_send_bytes = 0;
   int sent_bytes = 1;
   while ((unsigned int) already_send_bytes < file_str.length() && sent_bytes > 0) {
-    log_message("Sending tcp packet");
-    sent_bytes = send(sock,
+    log_message("Sending tcp packet "+std::to_string(file_str.length() - already_send_bytes) + "    "+(file_str.c_str() + already_send_bytes));
+    sent_bytes = write(sock,
                         file_str.c_str() + already_send_bytes,
-                        file_str.length() - already_send_bytes,
-                        0);
+                        file_str.length() - already_send_bytes);
     if (sent_bytes) {
 //      TODO: handle error
       log_message("Unable to send tcp packet");
@@ -56,11 +55,12 @@ void Node::ReceiveFile(int sock,
 
   log_message("Receiving file, writing to " + path_to_dir + "/" + filename);
   std::ofstream output_stream(path_to_dir + "/" + filename);
-  int number_of_received_bytes;
+  int number_of_received_bytes=5;
+//  sleep(1);
   do {
     number_of_received_bytes =
-        recv(sock, buffer, 1000, 0);
-    log_message("Received package");
+        read(sock, buffer, 1000);
+    log_message("Received package "+std::to_string(number_of_received_bytes));
     if (number_of_received_bytes > 0) {
       std::string received_bytes(buffer, number_of_received_bytes);
       log_message("Writing (" + received_bytes + ")to file");

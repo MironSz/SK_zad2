@@ -13,7 +13,7 @@ class ComplexCommand : public Command {
   ComplexCommand(std::string buffor) : Command(buffor) {};
   ComplexCommand(int socket,
                  int flags,
-                 sockadrr_in *src_addr,
+                 sockaddr_in &src_addr,
                  uint64_t seq_nr,
                  std::string expected_command,
                  socklen_t rcva_len = sizeof(sockaddr_in)) :

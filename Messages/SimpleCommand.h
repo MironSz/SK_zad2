@@ -22,7 +22,7 @@ class SimpleCommand : public Command {
   SimpleCommand(std::string cmd, uint64_t cmd_seq, std::string data);
   SimpleCommand(int socket,
                 int flags,
-                struct sockadrr_in *src_addr,
+                sockaddr_in &src_addr,
                 uint64_t seq_nr,
                 std::string expected_command,
                 socklen_t rcva_len = sizeof(sockaddr)) :

@@ -43,12 +43,12 @@ void *Command::CmdBegin() {
   return (void *) (buffor_.data());
 }
 
-int Command::SendTo(int sock, int flags, const sockaddr *dest_addr, socklen_t addrlen) {
+int Command::SendTo(int sock, int flags, const sockaddr_in &dest_addr, socklen_t addrlen) {
   auto bytes_sent = sendto(sock,
                            (char *) buffor_.data(),
                            (size_t) buffor_.length(),
                            (int) flags,
-                           dest_addr,
+                           reinterpret_cast<const sockaddr *>(&dest_addr),
                            sizeof(sockaddr_in));
   if (bytes_sent != buffor_.length()) {
     log_message("Unable to send message, error code : " + std::to_string(bytes_sent));
@@ -69,7 +69,7 @@ bool CheckCommand(std::string expected_command, std::string buffor) {
 }
 Command::Command(int socket,
                  int flags,
-                 sockadrr_in *src_addr,
+                 sockaddr_in &src_addr,
                  uint64_t seq_nr,
                  std::string expected_command,
                  socklen_t rcva_len) {
@@ -78,7 +78,7 @@ Command::Command(int socket,
   char inner_buffer[BUFFER_SIZE];
 
   int bytes_read = recvfrom(socket, inner_buffer, BUFFER_SIZE, flags,
-                            reinterpret_cast<sockaddr *>(src_addr),
+                            reinterpret_cast<sockaddr *>(&src_addr),
                             (&rcva_len));
   log_message("Command: Received bytes " + std::to_string(bytes_read));
 
@@ -100,7 +100,7 @@ Command::Command(int socket,
 }
 Command *Command::ReadCommand(int socket,
                               int flags,
-                              sockadrr_in *src_addr,
+                              sockaddr_in &src_addr,
                               uint64_t seq_nr,
                               std::string expected_command,
                               socklen_t rcva_len) {

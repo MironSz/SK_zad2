@@ -141,14 +141,14 @@ void ClientNode::Discover() {
 
   request_message.SendTo(multicast_socket_,
                          0,
-                         reinterpret_cast<const sockaddr *>(&server_address_),
+                         server_address_,
                          sizeof(server_address_));
 
   log_message("Sent message");
 
   ComplexCommand response_message(multicast_socket_,
                                   0,
-                                  reinterpret_cast<struct sockadrr_in *>(&server_address_),
+                                  server_address_,
                                   send_seq,
                                   "GOOD_DAY");
 
@@ -158,7 +158,7 @@ void ClientNode::Discover() {
            inet_ntoa(server_address_.sin_addr), response_message.GetParam());
     response_message = ComplexCommand(multicast_socket_,
                                       0,
-                                      reinterpret_cast<struct sockadrr_in *>(&server_address_),
+                                      server_address_,
                                       send_seq,
                                       "GOOD_DAY");
   }
@@ -169,12 +169,12 @@ void ClientNode::Search(std::string filename) {
   SimpleCommand request("LIST", seq, filename);
   request.SendTo(multicast_socket_,
                  0,
-                 reinterpret_cast<sockaddr *>(&server_address_),
+                 server_address_,
                  sizeof(server_address_));
   sockaddr_in last_server;
   SimpleCommand response_message(multicast_socket_,
                                  0,
-                                 reinterpret_cast<struct sockadrr_in *>(&last_server),
+                                 last_server,
                                  seq,
                                  "MY_LIST");
   while (response_message.GetLen() > 0) {
@@ -187,7 +187,7 @@ void ClientNode::Search(std::string filename) {
 
     response_message = SimpleCommand(multicast_socket_,
                                      0,
-                                     reinterpret_cast<struct sockadrr_in *>(&last_server),
+                                     last_server,
                                      seq,
                                      "MY_LIST");
   }
@@ -204,12 +204,12 @@ void ClientNode::Fetch(std::string filename) {
   SimpleCommand request("GET", seq_nr, filename);
   request.SendTo(multicast_socket_,
                  0,
-                 reinterpret_cast<sockaddr *>(&remembered_files[filename]),
+                 remembered_files[filename],
                  sizeof(sockaddr_in));
 
   ComplexCommand response(multicast_socket_,
                           0,
-                          reinterpret_cast<struct sockadrr_in *>(&server_address_),
+                          server_addr,
                           seq_nr,
                           "CONNECT_ME");
   if (response.GetLen() == 0) {
@@ -221,26 +221,25 @@ void ClientNode::Fetch(std::string filename) {
 
   int sock = socket(PF_INET, SOCK_STREAM, 0); // creating IPv4 TCP socket
   socklen_t addr_len = sizeof(sockaddr_in);
-  server_addr.sin_family = AF_INET; // IPv4
-  server_addr.sin_addr = server_address_.sin_addr; //
   server_addr.sin_port = htobe64(response.GetParam()); // listening on port PORT_NUM
 
 
   log_message("Connecting tos on " + std::to_string(server_addr.sin_port) + " "
                   + std::to_string(server_addr.sin_addr.s_addr));
 
-
-//  pollfd pfd;
-//  pfd.fd = sock;
-//  pfd.events = POLLOUT;
-//  int ret = poll(&pfd,1, timeout_*1000);
-//  if(ret < 0){
-//    log_message("Poll failed");
-//    return;
-//  }
+  pollfd pfd;
+  pfd.fd = sock;
+  pfd.events = POLLOUT;
+  int ret = poll(&pfd, 1, timeout_ * 1000);
+  if (ret < 0) {
+    log_message("Poll failed");
+    return;
+  }
   int msg_sock = connect(sock, reinterpret_cast<sockaddr *>(&server_addr), addr_len);
-  if (msg_sock < 0)
+  if (msg_sock < 0) {
     log_message("Couldnt connect");
+    return;
+  }
 
   struct timeval tv;
 

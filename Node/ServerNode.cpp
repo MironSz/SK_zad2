@@ -131,7 +131,7 @@ void ServerNode::StartWorking() {
   while (true) {
     Command *request = Command::ReadCommand(multicast_socket_,
                                             0,
-                                            reinterpret_cast< sockadrr_in *>(&client_address_),
+                                            client_address_,
                                             0,
                                             "",
                                             sizeof(sockaddr_in));
@@ -178,7 +178,7 @@ void ServerNode::Discover(Command *command) {
 
   response.SendTo(multicast_socket_,
                   0,
-                  reinterpret_cast<const sockaddr *>(&client_address_),
+                  client_address_,
                   sizeof(client_address_));
   log_message("Sent response");
 
@@ -200,7 +200,7 @@ void ServerNode::Search(Command *command) {
         SimpleCommand response(my_list, command->GetSeq(), inner_buffer);
         response.SendTo(multicast_socket_,
                         0,
-                        reinterpret_cast<const sockaddr *>(&client_address_),
+                        client_address_,
                         sizeof(client_address_));
         inner_buffer = "";
       }
@@ -212,7 +212,7 @@ void ServerNode::Search(Command *command) {
     SimpleCommand response(my_list, command->GetSeq(), inner_buffer);
     response.SendTo(multicast_socket_,
                     0,
-                    reinterpret_cast<const sockaddr *>(&client_address_),
+                    client_address_,
                     sizeof(client_address_));
     inner_buffer = "";
   }
@@ -254,7 +254,7 @@ void ServerNode::Fetch(Command *command) {
 
   connect_me.SendTo(multicast_socket_,
                     0,
-                    reinterpret_cast<sockaddr *> (&client_address_),
+                    client_address_,
                     sizeof(client_address_));
 
   log_message("Sent \"CONNECT_ME\" message, attempting to establish connection");
@@ -287,7 +287,8 @@ void ServerNode::Fetch(Command *command) {
 
   tv.tv_sec = timeout_;  /* 30 Secs Timeout */
   setsockopt(msg_sock, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *) &tv, sizeof(struct timeval));
-
+  char aa[] = "aaaaaaaaaaaa";
+  printf("send %zd\n" ,write(msg_sock,aa,5));
   log_message("Detaching thread");
   detached_threads_.emplace_back(Node::SendFile,
                                  msg_sock,

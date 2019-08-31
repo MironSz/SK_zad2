@@ -24,13 +24,13 @@ class Command {
   Command(std::string buffor) : buffor_(buffor) {};
   static Command *ReadCommand(int socket,
                               int flags,
-                              struct sockadrr_in *src_addr,
+                              sockaddr_in &src_addr,
                               uint64_t seq_nr,
                               std::string expected_command,
                               socklen_t rcva_len);
   Command(int socket,
           int flags,
-          struct sockadrr_in *src_addr,
+          sockaddr_in &src_addr,
           uint64_t seq_nr,
           std::string expected_command,
           socklen_t rcva_len = sizeof(sockaddr_in));
@@ -40,7 +40,7 @@ class Command {
   int GetLen();
   uint64_t GetSeq();
 
-  int SendTo(int sock, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
+  int SendTo(int sock, int flags, const  sockaddr_in &dest_addr, socklen_t addrlen);
 };
 
 #endif //SK2_MESSAGES_COMMAND_H_

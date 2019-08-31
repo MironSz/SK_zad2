@@ -1,58 +1,66 @@
 //
 // Created by miron on 22.08.2019.
 //
-#include <string>
+#include <boost/program_options.hpp>
+#include <iostream>
+#include <fstream>
+#include <cctype>
+#include <unistd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/socket.h>
-int main( int argc,char ** argv){
-  int sock, optval;
-  int timeout = 10;
-  struct sockaddr_in client_address;
-  struct sockaddr_in server_address;;
-  sock = socket(AF_INET, SOCK_DGRAM, 0);
-  if (sock < 0)
-    throw "Unable to open socket";
+#include <regex>
+#include <poll.h>
+using namespace boost::program_options;
 
-  optval = 1;
-  if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void *) &optval, sizeof(int)) < 0)
-    throw "setsockopt(SO_REUSEADDR) failed";
-  optval = 1;
-  if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (void *) &optval,
-                 sizeof optval) < 0)
-    throw "setsockopt broadcast";
+int main(int argc, char **argv) {
+  std::string mcast_addr_, path_to_folder_, type;
+  int cmd_port_, timeout_;
+  options_description desc{"Options"};
+  desc.add_options()
+      ("g", value<std::string>()->required(), "Adres rozglaszania ukierunkowanego")
+      ("p", value<int>()->required(), "Port UDP")
+      ("o", value<std::string>()->required(), "Path to files")
+      ("t", value<int>()->default_value(5), "Timeout")
+      ("n", value<std::string>(), "Node type");
+  variables_map vm;
+  store(command_line_parser(argc, argv).options(desc).style(
+      command_line_style::long_allow_adjacent |
+          command_line_style::short_allow_adjacent |
+          command_line_style::allow_long_disguise).run(), vm);
 
-  optval = 100;
-  if (setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, (void *) &optval,
-                 sizeof optval) < 0)
-    throw "setsockopt multicast ttl";
-  struct timeval opttime;
-  opttime.tv_sec = timeout;
-  opttime.tv_usec = 0;
+  notify(vm);
 
-  if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (void *) &opttime, sizeof opttime) < 0)
-    throw ("setsockopt receive timeout_");
+  if (vm.count("g")) {
+    mcast_addr_ = vm["g"].as<std::string>();
+  }
+  if (vm.count("p")) {
+    cmd_port_ = vm["p"].as<int>();
+  }
+  if (vm.count("o")) {
+    path_to_folder_ = vm["o"].as<std::string>();
+  }
+  if (vm.count("n")) {
+    type = vm["n"].as<std::string>();
+  }
+  if (vm.count("t")) {
+    timeout_ = vm["t"].as<int>();
+  }
+  if(type == "server"){
+    sockaddr_in dest_addres;
+    int sock = socket(PF_INET, SOCK_STREAM, 0); // creating IPv4 TCP socket
+    dest_addres.sin_port = htobe64(40002);
+    dest_addres.sin_family = AF_INET; // IPv4
+    dest_addres.sin_addr.s_addr = htobe64(INADDR_ANY);
+    socklen_t len  = sizeof(sockaddr_in);
+    if (bind(sock, (sockaddr *)&dest_addres, sizeof dest_addres)){
+      std :: cout << "error bind 1";
+      return 1;
+    }
+  }
 
-  /* podpięcie się do grupy rozsyłania (ang. multicast) */
-  struct ip_mreq mreq;
-  mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-  std::string mcast_addr = "230.200.120.1";
-  if (inet_aton(mcast_addr.c_str(), &mreq.imr_multiaddr) == 0)
-    throw ("inet_aton");
-  if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *) &mreq,
-                 sizeof (ip_mreq)) < 0)
-    throw ("setsockopt");
 
-  client_address.sin_family = AF_INET;
-  client_address.sin_addr.s_addr = htonl(INADDR_ANY);
-  client_address.sin_port = htons(0);
 
-  server_address.sin_family = AF_INET;
-  int cmd_port = 1234;
-  server_address.sin_port = htons(cmd_port);
-  if (inet_aton(mcast_addr.c_str(), &server_address.sin_addr) == 0)
-    throw ("inet_aton");
-  if (bind(sock, (struct sockaddr *) &client_address, sizeof(client_address)) < 0)
-    throw "bind";
 }
