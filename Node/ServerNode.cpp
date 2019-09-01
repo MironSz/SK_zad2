@@ -172,7 +172,7 @@ void ServerNode::Discover(Command *command) {
   log_message("Started Discover");
 
   std::string good = "GOOD_DAY";
-  ComplexCommand response(good, command->GetSeq(), (uint64_t) free_space_, ip);
+  ComplexCommand response(good, command->GetSeq(), (uint64_t) free_space_, mcast_addr_);
   auto h = response.GetData();
   log_message("Sending response");
 

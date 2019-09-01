@@ -154,8 +154,9 @@ void ClientNode::Discover() {
 
   while (response_message.GetLen() > 0) {
     log_message("Processing response " + response_message.GetCommand());
-    printf("Found %s (%s) with free space %lu\n", response_message.GetData().c_str(),
-           inet_ntoa(server_address_.sin_addr), response_message.GetParam());
+    printf("Found %s (%s) with free space %lu\n", inet_ntoa(server_address_.sin_addr),
+           response_message.GetData().c_str(),
+           response_message.GetParam());
     response_message = ComplexCommand(multicast_socket_,
                                       0,
                                       server_address_,
@@ -195,7 +196,6 @@ void ClientNode::Search(std::string filename) {
 }
 void ClientNode::Fetch(std::string filename) {
   if (remembered_files.find(filename) == remembered_files.end()) {
-//    TODO: Log exceptions or sth
     log_message("Could  not find the file\n");
     return;
   }
