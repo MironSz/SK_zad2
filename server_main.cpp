@@ -5,8 +5,6 @@
 
 #include "Node/ServerNode.h"
 int main( int argc,char ** argv){
-
-
-  ServerNode server_node(argv,argc);
+    ServerNode server_node(argv,argc);
   server_node.StartWorking();
 }

@@ -242,20 +242,14 @@ void ServerNode::Fetch(Command *command) {
     log_message("Could not open socket");
     return;
   }
-  uint64_t opened_port = be64toh(server_address.sin_port);
+  uint64_t opened_port = htons(server_address.sin_port);
   log_message("Opened port " + std::to_string(opened_port));
 
-  ComplexCommand connect_me(s_connect_me, command->GetSeq(), opened_port, filename);
   if (listen(sock, 1) < 0) {
     log_message("Couldn't start listening");
     return;
   } else
     log_message("Started listening");
-
-  connect_me.SendTo(multicast_socket_,
-                    0,
-                    client_address_,
-                    sizeof(client_address_));
 
   log_message("Sent \"CONNECT_ME\" message, attempting to establish connection");
 
@@ -263,6 +257,13 @@ void ServerNode::Fetch(Command *command) {
   client_addr.sin_port = server_address.sin_port;
   log_message("Accetping connections on " + std::to_string(client_addr.sin_port) + " "
                   + std::to_string(client_addr.sin_addr.s_addr));
+
+  ComplexCommand connect_me(s_connect_me, command->GetSeq(), opened_port, filename);
+
+  connect_me.SendTo(multicast_socket_,
+                    0,
+                    client_address_,
+                    sizeof(client_address_));
 
   pollfd pfd;
   pfd.fd = sock;
@@ -275,7 +276,7 @@ void ServerNode::Fetch(Command *command) {
     log_message("Client did not connect");
     return;
   }
-  int msg_sock = accept(sock, (struct sockaddr *) &client_addr, &addr_len);
+  int msg_sock = accept(sock, (sockaddr *) &client_addr, &addr_len);
   if (msg_sock >= 0)
     log_message("Accepted connection");
   else {
@@ -283,13 +284,14 @@ void ServerNode::Fetch(Command *command) {
     return;
   }
 
-  struct timeval tv;
+  timeval tv;
 
   tv.tv_sec = timeout_;  /* 30 Secs Timeout */
   setsockopt(msg_sock, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *) &tv, sizeof(struct timeval));
-  char aa[] = "aaaaaaaaaaaa";
-  printf("send %zd\n" ,write(msg_sock,aa,5));
+//  char aa[] = "aaaaaaaaaaaa";
+//  printf("send %zd\n" ,write(msg_sock,aa,5));
   log_message("Detaching thread");
+//  Node::SendFile(msg_sock,client_addr,path_to_folder_,filename);
   detached_threads_.emplace_back(Node::SendFile,
                                  msg_sock,
                                  client_addr,

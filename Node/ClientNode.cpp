@@ -111,10 +111,12 @@ void ClientNode::StartWorking() {
   std::regex search("^search\\s+(\\w*)$");
   std::regex argument("(\\w*)$");
   while (true) {
+    log_message("Awaiting instruction");
     std::smatch matched;
 
     std::string command;
     std::getline(std::cin, command);
+    log_message("Instruction (" + command+")");
 
     if (std::regex_search(command, matched, exit)) {
       std::cout << matched[0];
@@ -212,6 +214,7 @@ void ClientNode::Fetch(std::string filename) {
                           server_addr,
                           seq_nr,
                           "CONNECT_ME");
+
   if (response.GetLen() == 0) {
     log_message("Did not receive response");
     return;
@@ -221,31 +224,25 @@ void ClientNode::Fetch(std::string filename) {
 
   int sock = socket(PF_INET, SOCK_STREAM, 0); // creating IPv4 TCP socket
   socklen_t addr_len = sizeof(sockaddr_in);
-  server_addr.sin_port = htobe64(response.GetParam()); // listening on port PORT_NUM
+  server_addr.sin_port = htons(response.GetParam()); // listening on port PORT_NUM
 
 
-  log_message("Connecting tos on " + std::to_string(server_addr.sin_port) + " "
+  log_message("Connecting to server on " + std::to_string(server_addr.sin_port) + " "
                   + std::to_string(server_addr.sin_addr.s_addr));
 
-  pollfd pfd;
-  pfd.fd = sock;
-  pfd.events = POLLOUT;
-  int ret = poll(&pfd, 1, timeout_ * 1000);
-  if (ret < 0) {
-    log_message("Poll failed");
-    return;
-  }
   int msg_sock = connect(sock, reinterpret_cast<sockaddr *>(&server_addr), addr_len);
   if (msg_sock < 0) {
     log_message("Couldnt connect");
     return;
+  } else {
+    log_message("Connected");
   }
 
   struct timeval tv;
 
   tv.tv_sec = timeout_;  /* 30 Secs Timeout */
-  setsockopt(msg_sock, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *) &tv, sizeof(struct timeval));
-
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *) &tv, sizeof(struct timeval));
+//  ReceiveFile(sock, server_addr, path_to_folder_, filename);
   detached_threads.emplace_back(Node::ReceiveFile,
                                 msg_sock,
                                 server_addr,
