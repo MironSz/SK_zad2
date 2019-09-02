@@ -399,6 +399,10 @@ void ServerNode::Remove(Command *command) {
   }
   FreeGlobalLock();
 }
+ServerNode::~ServerNode() {
+  for(auto & thread: detached_threads_)
+    thread.join();
+}
 
 
 

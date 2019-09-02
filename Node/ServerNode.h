@@ -45,6 +45,7 @@ class ServerNode : public Node {
   bool CheckIfFileExists(std::string filename);
   void Upload(ComplexCommand *command);
   void Remove(Command *command);
+  virtual ~ServerNode();
 };
 
 #endif //UNTITLED__SERVERNODE_H_
