@@ -8,5 +8,6 @@
 #define CMD_LENGTH 10
 #define BUFFER_SIZE 1000
 
-void log_message(std::string);
+void log_message(std::string, int priority=2);
+
 #endif //SK2__LIB_H_

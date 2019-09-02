@@ -13,8 +13,9 @@
 #include <sys/socket.h>
 #include <thread>
 #include "../Messages/Command.h"
+#include "../Messages/ComplexCommand.h"
 #include "Node.h"
-class ServerNode : public Node{
+class ServerNode : public Node {
  private:
   std::list<std::thread> detached_threads_;
   ip_mreq ip_mreq_;
@@ -35,13 +36,15 @@ class ServerNode : public Node{
   ServerNode(char **argsv, int argc);
   void StartWorking();
   void IndexFiles();
+  void GetGlobalLock();
+  void FreeGlobalLock();
 //  void ConnectMcaddr();
   void Discover(Command *command);
   void Fetch(Command *command);
   void Search(Command *command);
   bool CheckIfFileExists(std::string filename);
-//  void Upload(std::string filename);
-//  void Remove(std::string filename);
+  void Upload(ComplexCommand *command);
+  void Remove(Command *command);
 };
 
 #endif //UNTITLED__SERVERNODE_H_

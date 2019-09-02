@@ -7,13 +7,13 @@
 #define BUFFER_SIZE 1000
 #define CMD_LENGTH 10
 
-ComplexCommand::ComplexCommand(std::string &cmd,
+ComplexCommand::ComplexCommand(std::string cmd,
                                uint64_t cmd_seq,
                                uint64_t param,
-                               std::string &data) : Command(cmd,
-                                                            cmd_seq,
-                                                            data,
-                                                            (int) sizeof(uint64_t)) {
+                               std::string data) : Command(cmd,
+                                                           cmd_seq,
+                                                           data,
+                                                           (int) sizeof(uint64_t)) {
   param = htobe64(param);
   memcpy((char *) SeqBegin() + sizeof(uint64_t), (void *) &param, sizeof(param));
 }

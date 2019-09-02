@@ -24,8 +24,8 @@ using namespace boost::program_options;
 #include "../Messages/SimpleCommand.h"
 #include "../Messages/ComplexCommand.h"
 #include "ServerNode.h"
-#define DEFAULT_SPACE 1000
-//#define DEFAULT_SPACE 52428800
+//#define DEFAULT_SPACE 1000
+#define DEFAULT_SPACE 52428800
 
 
 
@@ -73,11 +73,15 @@ void ServerNode::OpenMulticastSocket() {
 void ServerNode::ParseArguments(char **argv, int argc) {
   options_description desc{"Options"};
   desc.add_options()
-      ("g", value<std::string>()->required(), "Adres rozglaszania ukierunkowanego")
-      ("p", value<int>()->required(), "Port UDP")
-      ("b", value<int>()->required()->default_value(DEFAULT_SPACE), "Max shared space")
-      ("f", value<std::string>()->required(), "Path to shared folder")
-      ("t", value<int>()->default_value(5), "Timeout");
+      ("g",
+       value<std::string>()->required()->notifier(Node::CheckMcAddr),
+       "Adres rozglaszania ukierunkowanego")
+      ("p", value<int>()->required()->notifier(Node::CheckPort), "Port UDP")
+      ("b",
+       value<int>()->required()->default_value(DEFAULT_SPACE)->notifier(Node::CheckMaxSpace),
+       "Max shared space")
+      ("f", value<std::string>()->required()->notifier(Node::CheckPath), "Path to shared folder")
+      ("t", value<int>()->default_value(5)->notifier(Node::CheckTimeout), "Timeout");
 
   variables_map vm;
   store(command_line_parser(argc, argv).options(desc).style(
@@ -105,25 +109,18 @@ void ServerNode::ParseArguments(char **argv, int argc) {
 }
 ServerNode::ServerNode(char **argv, int argc) {
   ParseArguments(argv, argc);
+  Command::EnablePrintInvalidPackets();
   OpenMulticastSocket();
-//  AlternativeOpenSocket();
   IndexFiles();
 
   char hostbuffer[100];
   char *IPbuffer;
   struct hostent *host_entry;
-  // To retrieve hostname
   gethostname(hostbuffer, 30);
-
-  // To retrieve host information
   host_entry = gethostbyname(hostbuffer);
-  // To convert an Internet network
-  // address into ASCII string
-
   IPbuffer = inet_ntoa(*((struct in_addr *)
       host_entry->h_addr_list[0]));
   ip = std::string(IPbuffer);
-  std::cout << ip << "\n";
 }
 void ServerNode::StartWorking() {
   log_message("Started working");
@@ -143,13 +140,17 @@ void ServerNode::StartWorking() {
       Search(request);
     } else if (request->GetCommand() == "GET") {
       Fetch(request);
+    } else if (request->GetCommand() == "DEL") {
+      Remove(request);
+    } else if (request->GetCommand() == "ADD") {
+      Upload(reinterpret_cast<ComplexCommand *>(request));
     } else if (request->GetCommand() == "SERVER_EMERGENCY_SHUTDOWN_PROTOCOL_OVER_9000") {
       break;
     }
-
   }
 
 }
+
 void ServerNode::IndexFiles() {
   DIR *dir;
   dirent *ent;
@@ -160,6 +161,7 @@ void ServerNode::IndexFiles() {
         std::string filename(ent->d_name);
         files.push_back(filename);
         log_message("Indexed " + filename);
+        free_space_ -= FileSize(filename, path_to_folder_);
       }
     }
     closedir(dir);
@@ -251,8 +253,6 @@ void ServerNode::Fetch(Command *command) {
   } else
     log_message("Started listening");
 
-  log_message("Sent \"CONNECT_ME\" message, attempting to establish connection");
-
   sockaddr_in client_addr = server_address;
   client_addr.sin_port = server_address.sin_port;
   log_message("Accetping connections on " + std::to_string(client_addr.sin_port) + " "
@@ -288,15 +288,13 @@ void ServerNode::Fetch(Command *command) {
 
   tv.tv_sec = timeout_;  /* 30 Secs Timeout */
   setsockopt(msg_sock, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *) &tv, sizeof(struct timeval));
-//  char aa[] = "aaaaaaaaaaaa";
-//  printf("send %zd\n" ,write(msg_sock,aa,5));
   log_message("Detaching thread");
-//  Node::SendFile(msg_sock,client_addr,path_to_folder_,filename);
   detached_threads_.emplace_back(Node::SendFile,
                                  msg_sock,
                                  client_addr,
                                  path_to_folder_,
-                                 filename);
+                                 filename,
+                                 false);
 }
 
 bool ServerNode::CheckIfFileExists(std::string filename) {
@@ -306,6 +304,100 @@ bool ServerNode::CheckIfFileExists(std::string filename) {
     }
   }
   return false;
+}
+void ServerNode::Upload(ComplexCommand *command) {
+  log_message("Receive " + command->GetData() + " from client");
+  if (CheckIfFileExists(command->GetData())) {
+    log_message("File already on server");
+    SimpleCommand("NO_WAY", command->GetSeq(), command->GetData()).SendTo(multicast_socket_,
+                                                                          0,
+                                                                          client_address_,
+                                                                          sizeof(sockaddr_in));
+    return;
+  }
+  GetGlobalLock();
+  if (command->GetParam() > free_space_) {
+    SimpleCommand("NO_WAY", command->GetSeq(), command->GetData()).SendTo(multicast_socket_,
+                                                                          0,
+                                                                          client_address_,
+                                                                          sizeof(sockaddr_in));
+    FreeGlobalLock();
+    return;
+  }
+
+  sockaddr_in server_address;
+  std::string s_can_add = "CAN_ADD";
+  int sock = socket(PF_INET, SOCK_STREAM, 0); // creating IPv4 TCP socket
+
+  server_address.sin_family = AF_INET; // IPv4
+  server_address.sin_addr.s_addr = htonl(INADDR_ANY); //
+  server_address.sin_port = htons(0); // listening on port PORT_NUM
+  socklen_t addr_len = sizeof(client_address_);
+  if (bind(sock, reinterpret_cast<sockaddr * > (&server_address), addr_len) < 0 ||
+      getsockname(sock, reinterpret_cast<sockaddr * > (&server_address), &addr_len) < 0) {
+//    TODO:
+    log_message("Could not open socket");
+    return;
+  }
+  uint64_t opened_port = htons(server_address.sin_port);
+  log_message("Opened port " + std::to_string(opened_port));
+
+  if (listen(sock, 1) < 0) {
+    log_message("Couldn't start listening");
+    return;
+  } else
+    log_message("Started listening");
+
+  sockaddr_in client_addr = server_address;
+  client_addr.sin_port = server_address.sin_port;
+  log_message("Accetping connections on " + std::to_string(client_addr.sin_port) + " "
+                  + std::to_string(client_addr.sin_addr.s_addr));
+
+  ComplexCommand(s_can_add, command->GetSeq(), opened_port, "").SendTo(
+      multicast_socket_,
+      0,
+      client_address_,
+      sizeof(client_address_));
+
+  free_space_ -= command->GetParam();
+  int msg_sock = accept(sock, (sockaddr *) &client_addr, &addr_len);
+  if (msg_sock >= 0)
+    log_message("Accepted connection");
+  else {
+    log_message("Did not accept connection");
+    return;
+  }
+  FreeGlobalLock();
+  Node::ReceiveFile(msg_sock, client_addr, path_to_folder_, command->GetData(), opened_port, false);
+  GetGlobalLock();
+  files.push_back(command->GetData());
+  FreeGlobalLock();
+  log_message("Finnished upload");
+}
+void ServerNode::GetGlobalLock() {
+
+}
+void ServerNode::FreeGlobalLock() {
+
+}
+void ServerNode::Remove(Command *command) {
+  GetGlobalLock();
+  std::string filename = command->GetData();
+  int size = FileSize(filename, path_to_folder_);
+  if (remove((path_to_folder_ + "/" + command->GetData()).c_str()) != 0)
+    log_message("Error deleting file");
+  else {
+    log_message("File successfully deleted");
+    for (auto it = files.begin(); it != files.end(); it++) {
+      if (*it == filename) {
+        log_message("Erasing from list");
+        free_space_ += size;
+        files.erase(it);
+        break;
+      }
+    }
+  }
+  FreeGlobalLock();
 }
 
 

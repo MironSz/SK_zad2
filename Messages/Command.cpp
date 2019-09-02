@@ -57,10 +57,10 @@ int Command::SendTo(int sock, int flags, const sockaddr_in &dest_addr, socklen_t
 }
 
 bool CheckCommand(std::string expected_command, std::string buffor) {
-  if (buffor.length() < CMD_LENGTH+sizeof(uint64_t)) {
+  if (buffor.length() < CMD_LENGTH + sizeof(uint64_t)) {
     return false;
   }
-  if(expected_command=="")
+  if (expected_command == "")
     return true;
   expected_command.resize(CMD_LENGTH, 0);
   buffor.resize(CMD_LENGTH);
@@ -87,6 +87,23 @@ Command::Command(int socket,
       && seq_nr != 0 &&
       CheckCommand(expected_command, std::string(buffor_))) {
     log_message("Rereading the message because of reasons");
+    if (bytes_read >= 0 && PrintInvalidPackets) {
+      std::string error_message = "Uknown error";
+
+      if (be64toh(*(uint64_t *) (inner_buffer + CMD_LENGTH)) != seq_nr
+          && seq_nr != 0) {
+        error_message = "Wrong seq nr";
+      } else if (CheckCommand(expected_command, std::string(buffor_))) {
+        error_message = "Different command than expected";
+
+      }
+      printf("[PCKG ERROR] Skipping invalid package from %s:%d.%s\n",
+             inet_ntoa(src_addr.sin_addr),
+             ntohs(src_addr.sin_port),
+             error_message.c_str());
+
+    }
+
     bytes_read =
         recvfrom(socket, inner_buffer, BUFFER_SIZE, flags, (sockaddr *) &src_addr, (&rcva_len));
   }
@@ -117,4 +134,10 @@ Command *Command::ReadCommand(int socket,
 }
 std::string &Command::GetBuffer() {
   return buffor_;
+}
+
+bool Command::PrintInvalidPackets = false;
+
+void Command::EnablePrintInvalidPackets() {
+  Command::PrintInvalidPackets = true;
 }

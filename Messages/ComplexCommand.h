@@ -19,10 +19,10 @@ class ComplexCommand : public Command {
                  socklen_t rcva_len = sizeof(sockaddr_in)) :
       Command(socket, flags, src_addr, seq_nr,expected_command, rcva_len) {}
 
-  ComplexCommand(std::string &cmd,
+  ComplexCommand(std::string cmd,
                  uint64_t cmd_seq,
                  uint64_t param,
-                 std::string &data);
+                 std::string data);
   ComplexCommand(const ComplexCommand &) = default;
   uint64_t GetParam();
  private:

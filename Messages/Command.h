@@ -12,14 +12,19 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+
 class Command {
+
  protected:
+  static bool PrintInvalidPackets;
+
   std::string buffor_;
   virtual int DataBegin() = 0;
   void *SeqBegin();
   void *CmdBegin();
 
  public:
+  static void EnablePrintInvalidPackets();
   std::string &GetBuffer();
   Command(std::string buffor) : buffor_(buffor) {};
   static Command *ReadCommand(int socket,

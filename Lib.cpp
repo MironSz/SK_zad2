@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include "Lib.h"
-void log_message(std::string message) {
-  std::cout << "         "<<message << "\n";
+void log_message(std::string message, int priority) {
+//  if(priority<2)
+    std::cout << "         "<<message << "\n";
 }
